@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import pandas as pd
 
-
+st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
 def review_months (review_date):
@@ -25,14 +25,26 @@ def review_months (review_date):
 def style_based_on_next_review(row):
     next_review = row['next_review_months']
     if pd.notna(next_review):
-        if next_review < 3:
+        if next_review <=0:
             return ['color: red; font-weight: bold;'] * len(row)
+        elif next_review < 4:
+            return ['color: orange; font-weight: bold;'] * len(row)
         elif next_review < 6:
-            return ['color: yellow; font-weight: bold;'] * len(row)
+            return ['color: green; font-weight: bold;'] * len(row)
         else:
             return ['color: blue; font-weight: bold;'] * len(row)
     return [''] * len(row)
 
+def email_to_name(email):
+    # Extract the part before the "@" symbol
+    local_part = email.split('@')[0]
+    # Split by "."
+    parts = local_part.split('.')
+    # Capitalize each part
+    capitalized_parts = [part.capitalize() for part in parts]
+    # Join with a space
+    name = ' '.join(capitalized_parts)
+    return name
 
 # Calculate date 6 months from now, and convert to date format
 six_months = datetime.now() + relativedelta(months=6)
@@ -51,6 +63,11 @@ for item in data:
         url = item['download_url']  # Get the download URL
         file_data = requests.get(url).json()  # Fetch the JSON data from the URL
         table_id = item['name'].split('.')[0]  # Add the 'table_id' field
+        authored_by = file_data.get('authored_by', '')
+        if isinstance(authored_by, list):
+            authored_by = file_data['authored_by'][0]  # Take the first element if next_review is a list
+        #    authored_by = email_to_name('authored_by')
+
         measure_name = file_data.get('name', '') # Get measure name
         github_url = item['html_url'] # Get GitHub URL
         next_review = file_data.get('next_review', None)  # Get review date
@@ -60,6 +77,7 @@ for item in data:
             next_review = datetime.strptime(next_review, '%Y-%m-%d').date() # turn into date if not blank
         row = { # get data for each row
             'measure_name': measure_name,
+            'authored_by': email_to_name(authored_by),
             'next_review': next_review,
             'github_url': github_url,
             'next_review_months': review_months(next_review)
