@@ -6,7 +6,6 @@ import pandas as pd
 
 
 st.title("OpenPrescribing measures tracker")
-#st.write('')
 
 def review_months (review_date):
     # Get the current date
