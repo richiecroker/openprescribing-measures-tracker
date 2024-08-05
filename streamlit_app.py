@@ -88,8 +88,6 @@ else:
         st.error(f"Failed to retrieve data. Status code: {res.status_code}")
 
 
-import requests
-
 def get_open_pull_requests(repo_owner, repo_name, github_token):
     url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/pulls?state=open'
     headers = {'Authorization': f'token {github_token}'}
@@ -150,14 +148,20 @@ def find_changed_files_with_labels(repo_owner, repo_name, github_token, labels, 
     # Filter changed files to the specific directory
     directory_files = extract_files_in_directory(changed_files, directory_path)
 
-    # Create URLs for the changed files
-    file_urls = [f"https://github.com/{repo_owner}/{repo_name}/blob/main/{file}" for file in directory_files]
+    # Create URLs for the changed files in their respective branches
+    file_urls = []
+    for pr in filtered_pulls:
+        branch_name = pr['head']['ref']
+        for file in directory_files:
+            # Create a URL pointing to the specific branch and file
+            file_urls.append(f"https://github.com/{repo_owner}/{repo_name}/blob/{branch_name}/{file}")
 
     return file_urls
 
 # Example usage
 repo_owner = 'ebmdatalab'
 repo_name = 'openprescribing'
+github_token = 'your_github_token_here'  # Replace with your actual GitHub token
 labels = ['amend-measure', 'review-measure']
 directory_path = 'openprescribing/measures/definitions'
 
