@@ -180,7 +180,7 @@ def find_files_with_changes(repo_owner, repo_name, label, base_branch, github_to
 
 # Example usage
 repo_owner = 'ebmdatalab'
-repo_name = 'openprescribing'
+repo_name = 'openprescribing/measures/definitions/'
 label = 'amend-measure'
 base_branch = 'main'  # or 'master'
 #github_token = 'your_github_token_here'  # Replace with your actual token
