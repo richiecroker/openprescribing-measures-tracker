@@ -190,8 +190,8 @@ check_github_token(github_token)
 
 # Find files with changes
 files_with_changes = find_files_with_changes(repo_owner, repo_name, label, base_branch, github_token)
-print("Files with changes in branches with open pull requests labeled '{}':".format(label))
+st.write("Files with changes in branches with open pull requests labeled '{}':".format(label))
 for branch, files in files_with_changes.items():
-    print(f"Branch '{branch}':")
+    st.write(f"Branch '{branch}':")
     for file in files:
         st.write(f"  - {file}")
