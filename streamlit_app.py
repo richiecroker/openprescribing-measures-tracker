@@ -171,4 +171,4 @@ print("Files with changes in branches with open pull requests labeled '{}':".for
 for branch, files in files_with_changes.items():
     print(f"Branch '{branch}':")
     for file in files:
-st.write(f"  - {file}")
+        st.write(f"  - {file}")
