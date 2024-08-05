@@ -86,3 +86,42 @@ else:
             st.error("Unexpected data structure returned by the API.")
     else:
         st.error(f"Failed to retrieve data. Status code: {res.status_code}")
+
+
+
+
+def get_open_pull_requests(repo_owner, repo_name, github_token):
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/pulls?state=open'
+    headers = {'Authorization': f'token {github_token}'}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def filter_pull_requests_by_label(pulls, label):
+    filtered_pulls = []
+    for pr in pulls:
+        pr_labels = [l['name'] for l in pr.get('labels', [])]
+        if label in pr_labels:
+            filtered_pulls.append(pr)
+    return filtered_pulls
+
+
+def extract_branches_from_pull_requests(pulls):
+    branches = set()
+    for pr in pulls:
+        branches.add(pr['head']['ref'])
+    return branches
+
+def find_branches_with_label(repo_owner, repo_name, label, github_token):
+    pulls = get_open_pull_requests(repo_owner, repo_name, github_token)
+    filtered_pulls = filter_pull_requests_by_label(pulls, label)
+    branches = extract_branches_from_pull_requests(filtered_pulls)
+    return branches
+
+repo_owner = 'ebmdatalab'
+repo_name = 'openprescribing'
+label = 'amend-measure'
+# github_token = 'your_github_token_here'
+
+branches = find_branches_with_label(repo_owner, repo_name, label, github_token)
+print(f"Branches with open pull requests labeled '{label}': {branches}")
