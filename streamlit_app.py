@@ -72,9 +72,8 @@ for item in data:
         measure_name = file_data.get('name', '') # Get measure name
         github_url = item['html_url'] # Get GitHub URL
         next_review = file_data.get('next_review', None)  # Get review date
-        
         if isinstance(next_review, list):
-            next_review = next_review[0] if next_review else None
+    next_review = next_review[0] if next_review else None
 
         if next_review:
             next_review = datetime.strptime(next_review, '%Y-%m-%d').date()
