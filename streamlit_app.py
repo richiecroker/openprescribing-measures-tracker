@@ -90,7 +90,7 @@ for item in data:
         #    normalized_data.append(row) # add if blank review data
         #elif next_review <= six_months:
         #    normalized_data.append(row) # add if currently less than six months from review date
-            normalized_data.append(row)
+        normalized_data.append(row)
 
 normalized_data = sorted(normalized_data, key=lambda x: 
                          (x['next_review'] if x['next_review'] is not None else datetime.min.date())) # sort by review date, putting blank dates first
