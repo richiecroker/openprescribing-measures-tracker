@@ -135,28 +135,29 @@ def extract_files_in_directory(files, directory_path):
 def find_changed_files_with_labels(repo_owner, repo_name, github_token, labels, directory_path):
     pulls = get_open_pull_requests(repo_owner, repo_name, github_token)
     filtered_pulls = filter_pull_requests_by_labels(pulls, labels)
-    branches = extract_branches_from_pull_requests(filtered_pulls)
+    
+    file_urls = set()  # Use a set to avoid duplicate URLs
 
-    changed_files = set()
-    for branch in branches:
-        commits = get_commits_for_branch(repo_owner, repo_name, branch, github_token)
+    for pr in filtered_pulls:
+        branch_name = pr['head']['ref']
+        pr_commits_url = pr['commits_url']  # URL to get commits for the PR
+        
+        # Fetch commits associated with the PR
+        headers = {'Authorization': f'token {github_token}'}
+        commits_response = requests.get(pr_commits_url, headers=headers)
+        commits_response.raise_for_status()
+        commits = commits_response.json()
+        
         for commit in commits:
             commit_sha = commit['sha']
             files = get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token)
-            changed_files.update(files)
+            directory_files = extract_files_in_directory(files, directory_path)
+            
+            for file in directory_files:
+                # Create a URL pointing to the specific branch and file
+                file_urls.add(f"https://github.com/{repo_owner}/{repo_name}/blob/{branch_name}/{file}")
 
-    # Filter changed files to the specific directory
-    directory_files = extract_files_in_directory(changed_files, directory_path)
-
-    # Create URLs for the changed files in their respective branches
-    file_urls = []
-    for pr in filtered_pulls:
-        branch_name = pr['head']['ref']
-        for file in directory_files:
-            # Create a URL pointing to the specific branch and file
-            file_urls.append(f"https://github.com/{repo_owner}/{repo_name}/blob/{branch_name}/{file}")
-
-    return file_urls
+    return list(file_urls)
 
 # Example usage
 repo_owner = 'ebmdatalab'
