@@ -118,10 +118,26 @@ def find_branches_with_label(repo_owner, repo_name, label, github_token):
     branches = extract_branches_from_pull_requests(filtered_pulls)
     return branches
 
+def get_commits(repo_owner, repo_name, branch, github_token):
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/commits?sha={branch}'
+    headers = {'Authorization': f'token {github_token}'}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token):
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}'
+    headers = {'Authorization': f'token {github_token}'}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    commit_data = response.json()
+    files_changed = [file['filename'] for file in commit_data.get('files', [])]
+    return files_changed
+    
 repo_owner = 'ebmdatalab'
 repo_name = 'openprescribing'
 label = 'amend-measure'
 # github_token = 'your_github_token_here'
 
 branches = find_branches_with_label(repo_owner, repo_name, label, github_token)
-st.write(f"Branches with open pull requests labeled '{label}': {branches}")
+st.write(f"Branches with open pull requests labeled '{label}': {branches} with changed files '{files_changed}'")
