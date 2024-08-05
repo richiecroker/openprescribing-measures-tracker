@@ -124,4 +124,4 @@ label = 'amend-measure'
 # github_token = 'your_github_token_here'
 
 branches = find_branches_with_label(repo_owner, repo_name, label, github_token)
-print(f"Branches with open pull requests labeled '{label}': {branches}")
+st.write(f"Branches with open pull requests labeled '{label}': {branches}")
