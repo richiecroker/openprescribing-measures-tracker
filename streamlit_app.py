@@ -183,7 +183,7 @@ repo_owner = 'ebmdatalab'
 repo_name = 'openprescribing'
 label = 'urgent'
 base_branch = 'main'  # or 'master'
-github_token = 'your_github_token_here'  # Replace with your actual token
+#github_token = 'your_github_token_here'  # Replace with your actual token
 
 # Check GitHub token
 check_github_token(github_token)
