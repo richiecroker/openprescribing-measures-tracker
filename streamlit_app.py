@@ -133,11 +133,42 @@ def get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token)
     commit_data = response.json()
     files_changed = [file['filename'] for file in commit_data.get('files', [])]
     return files_changed
+
+def get_all_files_changed_in_branch(repo_owner, repo_name, base_branch, branch, github_token):
+    base_commits = get_commits(repo_owner, repo_name, base_branch, github_token)
+    branch_commits = get_commits(repo_owner, repo_name, branch, github_token)
+
+    base_commit_sha = base_commits[0]['sha'] if base_commits else None
+    branch_commit_shas = [commit['sha'] for commit in branch_commits]
+
+    changed_files = set()
+    for commit_sha in branch_commit_shas:
+        files = get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token)
+        changed_files.update(files)
+    
+    return changed_files
+
+def find_files_with_changes(repo_owner, repo_name, label, base_branch, github_token):
+    branches = find_branches_with_label(repo_owner, repo_name, label, github_token)
+    branch_changes = {}
+    
+    for branch in branches:
+        changed_files = get_all_files_changed_in_branch(repo_owner, repo_name, base_branch, branch, github_token)
+        branch_changes[branch] = changed_files
+
+    return branch_changes
+
+
     
 repo_owner = 'ebmdatalab'
 repo_name = 'openprescribing'
 label = 'amend-measure'
-# github_token = 'your_github_token_here'
+base_branch = 'main'
+github_token = 'your_github_token_here'
 
-branches = find_branches_with_label(repo_owner, repo_name, label, github_token)
-st.write(f"Branches with open pull requests labeled '{label}': {branches} with changed files '{files_changed}'")
+files_with_changes = find_files_with_changes(repo_owner, repo_name, label, base_branch, github_token)
+print("Files with changes in branches with open pull requests labeled '{}':".format(label))
+for branch, files in files_with_changes.items():
+    print(f"Branch '{branch}':")
+    for file in files:
+st.write(f"  - {file}")
