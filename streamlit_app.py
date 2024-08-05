@@ -59,12 +59,11 @@ normalized_data = []
 
 # Iterate through the files, process only .json files
 for item in data:
-    if isinstance(item, dict) and 'name' in item:
-        if item['name'].endswith('.json'):
-            url = item['download_url']  # Get the download URL
-            file_data = requests.get(url).json()  # Fetch the JSON data from the URL
-            table_id = item['name'].split('.')[0]  # Add the 'table_id' field
-            authored_by = file_data.get('authored_by', '')
+    if item['name'].endswith('.json'):
+        url = item['download_url']  # Get the download URL
+        file_data = requests.get(url).json()  # Fetch the JSON data from the URL
+        table_id = item['name'].split('.')[0]  # Add the 'table_id' field
+        authored_by = file_data.get('authored_by', '')
 
         if isinstance(authored_by, list):
             authored_by = authored_by[0] if authored_by else ''
