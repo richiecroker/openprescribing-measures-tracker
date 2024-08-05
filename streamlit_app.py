@@ -7,7 +7,7 @@ import pandas as pd
 st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
-def review_months (review_date):
+def review_months(review_date):
     # Get the current date
     current_date = datetime.now()
 
@@ -17,7 +17,7 @@ def review_months (review_date):
     # Calculate the total number of months
     total_months = difference.years * 12 + difference.months
 
-    if total_months <0:
+    if total_months < 0:
         total_months = 0
 
     return int(total_months)
@@ -25,7 +25,7 @@ def review_months (review_date):
 def style_based_on_next_review(row):
     next_review = row['next_review_months']
     if pd.notna(next_review):
-        if next_review <=0:
+        if next_review <= 0:
             return ['color: red; font-weight: bold;'] * len(row)
         elif next_review < 4:
             return ['color: orange; font-weight: bold;'] * len(row)
@@ -52,58 +52,64 @@ six_months = six_months.date()
 
 # Get data from OpenPrescribing measure definitions from Github API
 res = requests.get('https://api.github.com/repos/ebmdatalab/openprescribing/contents/openprescribing/measures/definitions')
-data = res.json()  # Convert the response to JSON
 
-# Create a list to store the normalized JSON data
-normalized_data = []
+# Check if the request was successful
+if res.status_code == 200:
+    data = res.json()  # Convert the response to JSON
+    
+    # Ensure 'data' is a list
+    if isinstance(data, list):
+        # Create a list to store the normalized JSON data
+        normalized_data = []
 
-# Iterate through the files, process only .json files
-for item in data:
-    if item['name'].endswith('.json'):
-        url = item['download_url']  # Get the download URL
-        file_data = requests.get(url).json()  # Fetch the JSON data from the URL
-        table_id = item['name'].split('.')[0]  # Add the 'table_id' field
-        authored_by = file_data.get('authored_by', '')
-        if isinstance(authored_by, list):
-            authored_by = file_data['authored_by'][0]  # Take the first element if next_review is a list
-        #    authored_by = email_to_name('authored_by')
+        # Iterate through the files, process only .json files
+        for item in data:
+            if isinstance(item, dict) and item.get('name', '').endswith('.json'):
+                url = item['download_url']  # Get the download URL
+                file_data = requests.get(url).json()  # Fetch the JSON data from the URL
+                table_id = item['name'].split('.')[0]  # Add the 'table_id' field
+                authored_by = file_data.get('authored_by', '')
+                if isinstance(authored_by, list):
+                    authored_by = file_data['authored_by'][0]  # Take the first element if authored_by is a list
 
-        measure_name = file_data.get('name', '') # Get measure name
-        github_url = item['html_url'] # Get GitHub URL
-        next_review = file_data.get('next_review', None)  # Get review date
-        if isinstance(next_review, list):
-            next_review = file_data['next_review'][0]  # Take the first element if next_review is a list
-        if next_review != None :
-            next_review = datetime.strptime(next_review, '%Y-%m-%d').date() # turn into date if not blank
-        row = { # get data for each row
-            'measure_name': measure_name,
-            'authored_by': email_to_name(authored_by),
-            'next_review': next_review,
-            'github_url': github_url,
-            'next_review_months': review_months(next_review)
-            }
-        #if next_review is None:
-        #    normalized_data.append(row) # add if blank review data
-        #elif next_review <= six_months:
-        #    normalized_data.append(row) # add if currently less than six months from review date
-    normalized_data.append(row)
-normalized_data = sorted(normalized_data, key=lambda x: 
-                         (x['next_review'] if x['next_review'] is not None else datetime.min.date())) # sort by review date, putting blank dates first
+                measure_name = file_data.get('name', '')  # Get measure name
+                github_url = item['html_url']  # Get GitHub URL
+                next_review = file_data.get('next_review', None)  # Get review date
+                if isinstance(next_review, list):
+                    next_review = file_data['next_review'][0]  # Take the first element if next_review is a list
+                if next_review is not None:
+                    next_review = datetime.strptime(next_review, '%Y-%m-%d').date()  # Turn into date if not blank
+                row = {  # Get data for each row
+                    'measure_name': measure_name,
+                    'authored_by': email_to_name(authored_by),
+                    'next_review': next_review,
+                    'github_url': github_url,
+                    'next_review_months': review_months(next_review)
+                }
+                normalized_data.append(row)
+        # Sort by review date, putting blank dates first
+        normalized_data = sorted(normalized_data, key=lambda x: (x['next_review'] if x['next_review'] is not None else datetime.min.date()))
 
-# Convert data to a DataFrame
-df = pd.DataFrame(normalized_data)
+        # Convert data to a DataFrame
+        df = pd.DataFrame(normalized_data)
 
-# Widgets to filter data
-months_filter = st.slider('Select number of months before review date', min_value=int(df['next_review_months'].min()), max_value=int(df['next_review_months'].max()), value=(int(df['next_review_months'].min()), int(df['next_review_months'].max())))
+        # Widgets to filter data
+        months_filter = st.slider('Select number of months before review date', min_value=int(df['next_review_months'].min()), max_value=int(df['next_review_months'].max()), value=(int(df['next_review_months'].min()), int(df['next_review_months'].max())))
 
-# Filter data based on the slider
-filtered_df = df[(df['next_review_months'] >= months_filter[0]) & (df['next_review_months'] <= months_filter[1])]
+        # Filter data based on the slider
+        filtered_df = df[(df['next_review_months'] >= months_filter[0]) & (df['next_review_months'] <= months_filter[1])]
 
-# Apply the function to style the DataFrame
-styled_df = filtered_df.style.apply(style_based_on_next_review, axis=1)
+        # Apply the function to style the DataFrame
+        styled_df = filtered_df.style.apply(style_based_on_next_review, axis=1)
 
-st.dataframe(
-    styled_df, 
-    hide_index=True,
-    column_config={"github_url":st.column_config.LinkColumn("Github link", display_text="https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/(.*?)"), "next_review_months": None}
-)
+        st.dataframe(
+            styled_df, 
+            hide_index=True,
+            column_config={"github_url":st.column_config.LinkColumn("Github link", display_text="https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/(.*?)"), "next_review_months": None}
+        )
+
+    else:
+        st.error("Unexpected data structure returned by the API.")
+else:
+    st.error(f"Failed to retrieve data. Status code: {res.status_code}")
+
