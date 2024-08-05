@@ -161,7 +161,6 @@ def find_changed_files_with_labels(repo_owner, repo_name, github_token, labels, 
 # Example usage
 repo_owner = 'ebmdatalab'
 repo_name = 'openprescribing'
-github_token = 'your_github_token_here'  # Replace with your actual GitHub token
 labels = ['amend-measure', 'review-measure']
 directory_path = 'openprescribing/measures/definitions'
 
