@@ -56,6 +56,9 @@ else:
                     authored_by = file_data.get('authored_by', '')
                     if isinstance(authored_by, list):
                         authored_by = file_data['authored_by'][0]
+                    checked_by = file_data.get('checked_by', '')
+                    if isinstance(checked_by, list):
+                        checked_by = file_data['checked_by'][0] 
 
                     measure_name = file_data.get('name', '')
                     github_url = item['html_url']
@@ -67,6 +70,7 @@ else:
                     row = {
                         'measure_name': measure_name,
                         'authored_by': email_to_name(authored_by),
+                        'checked_by': email_to_name(checked_by),
                         'next_review': next_review,
                         'github_url': github_url,
                         'next_review_months': review_months(next_review)
