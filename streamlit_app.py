@@ -4,15 +4,20 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import pandas as pd
 
+#set page details
 st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
+#define functions
+
+#calculate number of months until review
 def review_months(review_date):
     current_date = datetime.now()
     difference = relativedelta(review_date, current_date)
     total_months = difference.years * 12 + difference.months
     return max(int(total_months), 0)
 
+#set text colour depending on review distance
 def style_based_on_next_review(row):
     next_review = row['next_review_months']
     if pd.notna(next_review):
@@ -26,6 +31,7 @@ def style_based_on_next_review(row):
             return ['color: blue; font-weight: bold;'] * len(row)
     return [''] * len(row)
 
+#turn phc email address to name
 def email_to_name(email):
     local_part = email.split('@')[0]
     parts = local_part.split('.')
@@ -87,87 +93,3 @@ else:
     else:
         st.error(f"Failed to retrieve data. Status code: {res.status_code}")
 
-
-#def get_open_pull_requests(repo_owner, repo_name, github_token):
-#    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/pulls?state=open'
-#    headers = {'Authorization': f'token {github_token}'}
-#    response = requests.get(url, headers=headers)
-#    response.raise_for_status()
-#    return response.json()
-
-#def filter_pull_requests_by_labels(pulls, labels):
-#    filtered_pulls = []
-#    for pr in pulls:
-#        pr_labels = [l['name'] for l in pr.get('labels', [])]
-#        if any(label in pr_labels for label in labels):
-#            filtered_pulls.append(pr)
-#    return filtered_pulls
-
-#def extract_branches_from_pull_requests(pulls):
-#    branches = set()
-#    for pr in pulls:
-#        branches.add(pr['head']['ref'])
-#    return branches
-
-#def get_commits_for_branch(repo_owner, repo_name, branch, github_token):
-#    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/commits?sha={branch}'
-#    headers = {'Authorization': f'token {github_token}'}
-#    response = requests.get(url, headers=headers)
-#    response.raise_for_status()
-#    return response.json()
-
-#def get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token):
-#    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}'
-#    headers = {'Authorization': f'token {github_token}'}
-#    response = requests.get(url, headers=headers)
-#    response.raise_for_status()
-#    commit_data = response.json()
-#    files_changed = [file['filename'] for file in commit_data.get('files', [])]
-#    return files_changed
-
-#def extract_files_in_directory(files, directory_path):
-#    filtered_files = []
-#    for file in files:
-#        if file.startswith(directory_path):
-#            filtered_files.append(file)
-#    return filtered_files
-
-#def find_changed_files_with_labels(repo_owner, repo_name, github_token, labels, directory_path):
-#   pulls = get_open_pull_requests(repo_owner, repo_name, github_token)
-#    filtered_pulls = filter_pull_requests_by_labels(pulls, labels)
-    
-#    file_urls = set()  # Use a set to avoid duplicate URLs
-
-#    for pr in filtered_pulls:
-#        branch_name = pr['head']['ref']
-#        pr_commits_url = pr['commits_url']  # URL to get commits for the PR
-        
-#        # Fetch commits associated with the PR
-#        headers = {'Authorization': f'token {github_token}'}
-#        commits_response = requests.get(pr_commits_url, headers=headers)
-#        commits_response.raise_for_status()
-#        commits = commits_response.json()
-#        
-#        for commit in commits:
-#            commit_sha = commit['sha']
-#            files = get_files_changed_in_commit(repo_owner, repo_name, commit_sha, github_token)
-#            directory_files = extract_files_in_directory(files, directory_path)
-#            
-#            for file in directory_files:
-#                # Create a URL pointing to the specific branch and file
-#                file_urls.add(f"https://github.com/{repo_owner}/{repo_name}/blob/{branch_name}/{file}")
-#
-#    return list(file_urls)#
-
-# Example usage
-#repo_owner = 'ebmdatalab'
-#repo_name = 'openprescribing'
-#labels = ['amend-measure', 'review-measure']
-#directory_path = 'openprescribing/measures/definitions'
-
-# Find changed files with specified labels and directory
-#file_urls = find_changed_files_with_labels(repo_owner, repo_name, github_token, labels, directory_path)
-
-#st.write("Changed files with open PRs and specified labels:")
-#for url in file_urls:
-#    st.write(url)
