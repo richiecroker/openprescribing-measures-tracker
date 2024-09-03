@@ -87,7 +87,7 @@ else:
             months_filter = st.slider('Select number of months before review date', min_value=int(df['next_review_months'].min()), max_value=int(df['next_review_months'].max()), value=(int(df['next_review_months'].min()), int(df['next_review_months'].max())))
             filtered_df = df[(df['next_review_months'] >= months_filter[0]) & (df['next_review_months'] <= months_filter[1])]
             styled_df = filtered_df.style.apply(style_based_on_next_review, axis=1)
-            st.dataframe(styled_df, hide_index=True, use_container_width=True, height=2000, column_config={"github_url": st.column_config.LinkColumn("Github link", display_text="https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/(.*?)"), "next_review_months": None})
+            st.dataframe(styled_df, hide_index=True, use_container_width=True, height=4000, column_config={"github_url": st.column_config.LinkColumn("Github link", display_text="https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/(.*?)"), "next_review_months": None})
         else:
             st.error("Unexpected data structure returned by the API.")
     else:
