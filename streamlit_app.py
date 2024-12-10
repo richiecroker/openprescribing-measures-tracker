@@ -42,7 +42,7 @@ six_months = datetime.now() + relativedelta(months=6)
 six_months = six_months.date()
 
 # Read the GitHub token from Streamlit secrets
-github_token = st.secrets["github_token"]
+github_token = st.secrets["github_token"] 
 
 if github_token is None:
     st.error("GitHub token not found in Streamlit secrets.")
