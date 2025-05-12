@@ -101,8 +101,8 @@ else:
                 height=2500, 
                 column_config={
                     "github_url": st.column_config.LinkColumn(
-                        "Github link",  # Column header 
-                        display_text=measure_name  # Use 'name' column as display text
+                        "Github link",  
+                        display_text="measure_name"
                     ),
                     "next_review_months": None
                 }
