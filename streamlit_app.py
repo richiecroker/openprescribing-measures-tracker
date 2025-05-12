@@ -102,7 +102,7 @@ else:
                 column_config={
                     "github_url": st.column_config.LinkColumn(
                         "Github link",  # Column header 
-                        display_text="name"  # Use 'name' column as display text
+                        display_text=measure_name  # Use 'name' column as display text
                     ),
                     "next_review_months": None
                 }
