@@ -84,39 +84,13 @@ else:
                     normalized_data.append(row)
             normalized_data = sorted(normalized_data, key=lambda x: (x['next_review'] if x['next_review'] is not None else datetime.min.date()))
             df = pd.DataFrame(normalized_data)
-            
-
-            base_url = "https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/"
-            df['github_url'] = df['measure_name'].apply(lambda x: f"{base_url}{x}")
-
-            def make_clickable(val, url):
-                return f'<a href="{url}" target="_blank">{val}</a>'
-
-
             months_filter = st.slider('Select number of months before review date', min_value=int(df['next_review_months'].min()), max_value=int(df['next_review_months'].max()), value=(int(df['next_review_months'].min()), int(df['next_review_months'].max())))
             filtered_df = df[(df['next_review_months'] >= months_filter[0]) & (df['next_review_months'] <= months_filter[1])]
             styled_df = filtered_df.style.apply(style_based_on_next_review, axis=1)
-
-            styled_df = styled_df.style.format(
-                {
-                    'measure_name': lambda x, y=styled_df: make_clickable(
-                        x, 
-                        base_url + x
-                    )
-                }
-)
-            # Display the dataframe with the LinkColumn configuration
-            st.dataframe(
-                styled_df, 
-                hide_index=True, 
-                use_container_width=True, 
-                height=2500,
-                column_config={
-                    "next_review_months": None
-                }
-            )
+            st.dataframe(styled_df, hide_index=True, use_container_width=True, height=2500, column_config={"github_url": st.column_config.LinkColumn("Github link", display_text="https://github.com/ebmdatalab/openprescribing/blob/main/openprescribing/measures/definitions/(.*?)"), "next_review_months": None})
         else:
             st.error("Unexpected data structure returned by the API.")
     else:
+        st.error(f"Failed to retrieve data. Status code: {res.status_code}")
         st.error(f"Failed to retrieve data. Status code: {res.status_code}")
 
