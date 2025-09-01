@@ -91,10 +91,7 @@ else:
                         'next_review_months': review_months(next_review)
                     }
                     normalized_data.append(row)
-            normalized_data = sorted(
-                normalized_data,
-                key=lambda x: x['next_review'] if isinstance(x['next_review'], date) else datetime.min.date()
-            )
+            normalized_data = sorted(normalized_data, key=lambda x: (x['next_review'] if x['next_review'] is not None else datetime.min.date()))
             df = pd.DataFrame(normalized_data)
             months_filter = st.slider('Select number of months before review date', min_value=int(df['next_review_months'].min()), max_value=int(df['next_review_months'].max()), value=(int(df['next_review_months'].min()), int(df['next_review_months'].max())))
             filtered_df = df[(df['next_review_months'] >= months_filter[0]) & (df['next_review_months'] <= months_filter[1])]
