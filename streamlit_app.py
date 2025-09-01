@@ -73,9 +73,10 @@ else:
                         next_review = file_data['next_review'][0]
                     if next_review is not None:
                         try:
-                            next_review = datetime.strptime(next_review.strip(), "%Y-%m-%d").date()
+                            next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
                         except ValueError:
-                            next_review = "error"
+                        # Skip this row if the date is invalid
+                            continue
                     row = {
                         'measure_name': measure_name,
                         'authored_by': email_to_name(authored_by),
