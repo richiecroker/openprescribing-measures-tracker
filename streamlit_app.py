@@ -14,6 +14,8 @@ st.title("OpenPrescribing measures tracker")
 def review_months(review_date):
     current_date = datetime.now()
     difference = relativedelta(review_date, current_date)
+        if not isinstance(review_date, (date, datetime)):
+        return "error"
     total_months = difference.years * 12 + difference.months
     return max(int(total_months), 0)
 
