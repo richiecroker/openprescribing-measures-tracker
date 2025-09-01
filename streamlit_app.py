@@ -12,16 +12,12 @@ st.title("OpenPrescribing measures tracker")
 
 #calculate number of months until review
 def review_months(review_date):
-    current_date = date.today()
-    #If review_date is missing or invalid, show "error"
+    current_date = datetime.now()
     if not isinstance(review_date, (date, datetime)):
         return "error"
-    try:
-        difference = relativedelta(review_date, current_date)
-        return difference.years * 12 + difference.months
-    except Exception:
-        # If anything unexpected goes wrong, show "error"
-        return "error"
+    return difference.years * 12 + difference.months
+    difference = relativedelta(review_date, current_date)
+    return max(int(total_months), 0)
 
 #set text colour depending on review distance
 def style_based_on_next_review(row):
