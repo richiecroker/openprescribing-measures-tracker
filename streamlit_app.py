@@ -13,10 +13,10 @@ st.title("OpenPrescribing measures tracker")
 #calculate number of months until review
 def review_months(review_date):
     current_date = datetime.now()
-    difference = relativedelta(review_date, current_date)
     if not isinstance(review_date, (date, datetime)):
         return "error"
-    total_months = difference.years * 12 + difference.months
+    return difference.years * 12 + difference.months
+    difference = relativedelta(review_date, current_date)
     return max(int(total_months), 0)
 
 #set text colour depending on review distance
