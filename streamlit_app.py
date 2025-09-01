@@ -72,7 +72,7 @@ else:
                     if isinstance(next_review, list):
                         next_review = file_data['next_review'][0]
                     if next_review is not None:
-                        print(f"DEBUG: next_review={next_review} ({type(next_review)})")
+                        st.write("DEBUG: next_review =", next_review, "TYPE =", type(next_review))
                         next_review = datetime.strptime(next_review, '%Y-%m-%d').date()
                     row = {
                         'measure_name': measure_name,
