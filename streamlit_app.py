@@ -72,11 +72,8 @@ else:
                     if isinstance(next_review, list):
                         next_review = file_data['next_review'][0]
                     if next_review is not None:
-                        try:
-                            next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
-                        except ValueError:
-                        # Skip this row if the date is invalid
-                            continue
+                        st.write("DEBUG: next_review =", next_review, "TYPE =", type(next_review))
+                        next_review = datetime.strptime(next_review, '%Y-%m-%d').date()
                     row = {
                         'measure_name': measure_name,
                         'authored_by': email_to_name(authored_by),
