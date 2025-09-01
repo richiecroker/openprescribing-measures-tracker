@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from dateutil.relativedelta import relativedelta
-from datetime import datetime, date
+from datetime import datetime
 import pandas as pd
 
 #set page details
