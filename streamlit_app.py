@@ -89,6 +89,22 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         return None
 
 # ----------------------------
+# Cached pageviews fetcher
+# ----------------------------
+@st.cache_data(ttl=2592000)  # Cache for 30 days (2592000 seconds)
+def fetch_all_pageviews(measure_ids, site_id, api_key):
+    """
+    Fetch pageviews for all measures. Cached for 1 week.
+    Returns a dict with measure_id as key and tuple of (views_30d, views_12m) as value.
+    """
+    results = {}
+    for measure_id in measure_ids:
+        views_30d = plausible_pageviews(measure_id, "30d", site_id, api_key)
+        views_12m = plausible_pageviews(measure_id, "12mo", site_id, api_key)
+        results[measure_id] = (views_30d, views_12m)
+    return results
+
+# ----------------------------
 # Secrets
 # ----------------------------
 github_token = st.secrets.get("github_token")
@@ -170,19 +186,27 @@ if not valid_months.empty:
     ]
 
 # ----------------------------
-# Plausible enrichment
+# Plausible enrichment (CACHED)
 # ----------------------------
 if plausible_api_key and plausible_site_id:
     with st.spinner("Fetching Plausible pageviews…"):
-        df["views_30d"] = df["measure_id"].apply(
-            lambda m: plausible_pageviews(m, "30d", plausible_site_id, plausible_api_key)
+        # Fetch all pageviews at once (cached for 7 days)
+        pageviews_dict = fetch_all_pageviews(
+            df["measure_id"].tolist(),
+            plausible_site_id,
+            plausible_api_key
         )
-        df["views_12m"] = df["measure_id"].apply(
-            lambda m: plausible_pageviews(m, "12mo", plausible_site_id, plausible_api_key)
-        )
+        
+        # Apply to dataframe
+        df["views_30d"] = df["measure_id"].map(lambda m: pageviews_dict.get(m, (None, None))[0])
+        df["views_12m"] = df["measure_id"].map(lambda m: pageviews_dict.get(m, (None, None))[1])
 else:
     df["views_30d"] = None
     df["views_12m"] = None
+
+# Add cache info
+if plausible_api_key and plausible_site_id:
+    st.caption("ℹ️ Pageview data is cached for 7 days. Click 'Clear cache' in the menu (⋮) to force refresh.")
 
 # ----------------------------
 # Sort controls
