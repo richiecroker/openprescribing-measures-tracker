@@ -185,6 +185,32 @@ else:
     df["views_12m"] = None
 
 # ----------------------------
+# Sort controls
+# ----------------------------
+sort_col = st.selectbox(
+    "Sort by",
+    options=["next_review_months", "measure_name", "authored_by", "checked_by", "views_30d", "views_12m"],
+    format_func=lambda x: {
+        "next_review_months": "Months to review",
+        "measure_name": "Measure name",
+        "authored_by": "Authored by",
+        "checked_by": "Checked by",
+        "views_30d": "Views (30d)",
+        "views_12m": "Views (12m)"
+    }[x],
+    index=0
+)
+
+sort_order = st.radio("Order", options=["Ascending", "Descending"], horizontal=True)
+
+# Apply sorting
+df = df.sort_values(
+    by=sort_col,
+    ascending=(sort_order == "Ascending"),
+    na_position="last"
+)
+
+# ----------------------------
 # Render HTML table
 # ----------------------------
 cols = [
