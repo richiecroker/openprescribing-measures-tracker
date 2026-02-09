@@ -61,8 +61,8 @@ def measure_id_from_github_url(url):
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Fetches pageviews for a specific measure page.
-    Uses exact match for /measure/{measure_id}/ path.
+    Fetches pageviews for a specific measure page and all its subpages.
+    Uses contains filter to match /{measure_id}/ and children.
     """
     if not measure_id:
         return None
@@ -74,7 +74,7 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         "site_id": site_id,
         "metrics": "pageviews",
         "period": period,
-        "filters": f"event:page==/measure/{measure_id}/",
+        "filters": f"event:page~=/{measure_id}/",
     }
 
     try:
