@@ -57,12 +57,12 @@ def measure_id_from_github_url(url):
         return None
 
 # ----------------------------
-# Plausible helper (FIXED)
+# Plausible helper
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Fetches pageviews for a specific measure page and all its subpages.
-    Uses contains filter to match /{measure_id}/ and children.
+    Fetches pageviews for pages containing /{measure_id}/ anywhere in the path.
+    Matches patterns like /measure/{measure_id}/, /pcn/XXX/{measure_id}/, etc.
     """
     if not measure_id:
         return None
