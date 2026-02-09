@@ -260,8 +260,8 @@ for _, r in df.iterrows():
         f'<td style="{css}">{r["checked_by"]}</td>'
         f'<td style="{css}">{r["next_review"] or ""}</td>'
         f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
-        f'<td style="{css}">{r["views_30d"] or ""}</td>'
-        f'<td style="{css}">{r["views_12m"] or ""}</td>'
+        f'<td style="{css}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
+        f'<td style="{css}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
         "</tr>"
     )
 
