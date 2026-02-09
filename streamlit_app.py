@@ -270,61 +270,18 @@ if not valid_months.empty:
         & (df["next_review_months"].astype(int) <= months_filter[1])
     ]
 
-# ----------------------------
-# Enrich with Plausible counts using contains ("/{id}" token)
-# ----------------------------
+# Add this temporarily to see what's happening:
 if plausible_api_key and plausible_site_id:
-    with st.spinner("Fetching Plausible pageviews (cached)…"):
-        views_30 = []
-        views_12 = []
-        # We'll collect a sample debug payload for the first measure if debug=True
-        sample_debug = None
-
-        for i, row in df.iterrows():
-            mid = row.get("measure_id")
-            if not mid:
-                views_30.append(None)
-                views_12.append(None)
-                continue
-
-            # Primary behaviour: prefer contains vs exact as per user checkbox
-            if contains_first:
-                v30 = plausible_pageviews_contains(mid, "30d", plausible_site_id, plausible_api_key)
-                v12 = plausible_pageviews_contains(mid, "12mo", plausible_site_id, plausible_api_key)
-            else:
-                # try exact first (useful if site always uses /measure/<id>/) then contains fallback
-                v30 = None
-                v12 = None
-                # exact attempt
-                exact_params_30 = {"site_id": plausible_site_id, "metrics": "pageviews", "period": "30d", "filters": f"event:page==/measure/{mid}/"}
-                exact_params_12 = {"site_id": plausible_site_id, "metrics": "pageviews", "period": "12mo", "filters": f"event:page==/measure/{mid}/"}
-                exact_30 = plausible_query(plausible_site_id, plausible_api_key, exact_params_30)
-                exact_12 = plausible_query(plausible_site_id, plausible_api_key, exact_params_12)
-                if exact_30 and exact_30.get("results", {}).get("pageviews", {}).get("value") is not None:
-                    try:
-                        v30 = int(float(exact_30["results"]["pageviews"]["value"]))
-                    except Exception:
-                        v30 = None
-                if exact_12 and exact_12.get("results", {}).get("pageviews", {}).get("value") is not None:
-                    try:
-                        v12 = int(float(exact_12["results"]["pageviews"]["value"]))
-                    except Exception:
-                        v12 = None
-
-                # fallback to contains
-                if v30 is None:
-                    v30 = plausible_pageviews_contains(mid, "30d", plausible_site_id, plausible_api_key)
-                if v12 is None:
-                    v12 = plausible_pageviews_contains(mid, "12mo", plausible_site_id, plausible_api_key)
-
-            views_30.append(v30)
-            views_12.append(v12)
-
-            if debug and sample_debug is None:
-                sample_debug = plausible_raw_for_debug(mid, plausible_site_id, plausible_api_key)
-
-        df["views_30d"] = views_30
-        df["views_12m"] = views_12
+    with st.spinner("Fetching Plausible pageviews…"):
+        # Debug: print first few measure IDs
+        st.write("DEBUG - First 5 measure IDs:", df["measure_id"].head().tolist())
+        
+        def get_views_30d(measure_id):
+            result = plausible_pageviews(measure_id, "30d", plausible_site_id, plausible_api_key)
+            st.write(f"measure_id={measure_id}, views={result}")  # Debug output
+            return result
+        
+        df["views_30d"] = df["measure_id"].apply(get_views_30d)
 
         if debug and sample_debug:
             st.subheader("Plausible debug (sample raw request)")
