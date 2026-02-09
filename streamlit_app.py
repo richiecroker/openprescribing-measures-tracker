@@ -7,13 +7,13 @@ from urllib.parse import urlparse
 import os
 
 # ----------------------------
-# Page setup (UNCHANGED)
+# Page setup
 # ----------------------------
 st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
 # ----------------------------
-# Helpers (UNCHANGED)
+# Helpers
 # ----------------------------
 def review_months(review_date):
     if not review_date:
@@ -57,12 +57,12 @@ def measure_id_from_github_url(url):
         return None
 
 # ----------------------------
-# Plausible helper (WITH DEBUG)
+# Plausible helper (FIXED)
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Uses CONTAINS filter with leading slash: event:page~=/steve
-    This avoids collisions and prevents identical counts.
+    Fetches pageviews for a specific measure page.
+    Uses exact match for /measure/{measure_id}/ path.
     """
     if not measure_id:
         return None
@@ -74,37 +74,30 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         "site_id": site_id,
         "metrics": "pageviews",
         "period": period,
-        "filters": f"event:page~=/{measure_id}",
+        "filters": f"event:page==/measure/{measure_id}/",
     }
 
     try:
         r = requests.get(url, headers=headers, params=params, timeout=10)
         r.raise_for_status()
         value = r.json()["results"]["pageviews"]["value"]
-        result = int(float(value)) if value is not None else 0
-        st.write(f"DEBUG: measure_id={measure_id}, period={period}, result={result}")
-        return result
-    except Exception as e:
-        st.write(f"ERROR in plausible_pageviews: {measure_id}, {e}")
+        return int(float(value)) if value is not None else 0
+    except Exception:
         return None
 
 # ----------------------------
-# Secrets (UNCHANGED)
+# Secrets
 # ----------------------------
 github_token = st.secrets.get("github_token")
 plausible_api_key = st.secrets.get("plausible_api_key")
 plausible_site_id = st.secrets.get("plausible_site_id")
-
-st.write(f"DEBUG: github_token exists: {bool(github_token)}")
-st.write(f"DEBUG: plausible_api_key exists: {bool(plausible_api_key)}")
-st.write(f"DEBUG: plausible_site_id: {plausible_site_id}")
 
 if not github_token:
     st.error("Missing GitHub token")
     st.stop()
 
 # ----------------------------
-# Fetch measures from GitHub (UNCHANGED)
+# Fetch measures from GitHub
 # ----------------------------
 headers = {"Authorization": f"token {github_token}"}
 repo_url = (
@@ -113,13 +106,10 @@ repo_url = (
     "openprescribing/measures/definitions"
 )
 
-st.write("DEBUG: Fetching from GitHub...")
 res = requests.get(repo_url, headers=headers, timeout=15)
 if res.status_code != 200:
     st.error("Failed to fetch measure definitions")
     st.stop()
-
-st.write(f"DEBUG: Got {len(res.json())} items from GitHub")
 
 rows = []
 for item in res.json():
@@ -162,10 +152,9 @@ for item in res.json():
     })
 
 df = pd.DataFrame(rows)
-st.write(f"DEBUG: Created dataframe with {len(df)} rows")
 
 # ----------------------------
-# Slider filter (UNCHANGED)
+# Slider filter
 # ----------------------------
 valid_months = df["next_review_months"].dropna().astype(int)
 if not valid_months.empty:
@@ -177,13 +166,10 @@ if not valid_months.empty:
         & (df["next_review_months"].astype(int) <= rng[1])
     ]
 
-st.write(f"DEBUG: After filtering, {len(df)} rows")
-
 # ----------------------------
-# Plausible enrichment (WITH DEBUG)
+# Plausible enrichment
 # ----------------------------
 if plausible_api_key and plausible_site_id:
-    st.write("DEBUG: Starting Plausible enrichment...")
     with st.spinner("Fetching Plausible pageviews…"):
         df["views_30d"] = df["measure_id"].apply(
             lambda m: plausible_pageviews(m, "30d", plausible_site_id, plausible_api_key)
@@ -192,15 +178,11 @@ if plausible_api_key and plausible_site_id:
             lambda m: plausible_pageviews(m, "12mo", plausible_site_id, plausible_api_key)
         )
 else:
-    st.write("DEBUG: Skipping Plausible (no API key/site_id)")
     df["views_30d"] = None
     df["views_12m"] = None
 
-st.write("DEBUG: Plausible enrichment complete")
-st.write(df.head())
-
 # ----------------------------
-# Render HTML table (UNCHANGED)
+# Render HTML table
 # ----------------------------
 cols = [
     ("measure_name", "Measure"),
