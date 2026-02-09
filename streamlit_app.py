@@ -1,229 +1,215 @@
 import streamlit as st
 import requests
-from dateutil.relativedelta import relativedelta
-from datetime import datetime
 import pandas as pd
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from urllib.parse import urlparse
+import os
 
+# ----------------------------
+# Page setup
+# ----------------------------
 st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
+# ----------------------------
+# Helpers
+# ----------------------------
 def review_months(review_date):
-    """Return full months from now until review_date. If review_date is None, return pd.NA."""
-    if review_date is None or (isinstance(review_date, float) and pd.isna(review_date)):
+    if not review_date:
         return pd.NA
-    # normalize to date
-    if isinstance(review_date, datetime):
-        review_date = review_date.date()
     try:
-        current_date = datetime.now().date()
-        difference = relativedelta(review_date, current_date)
-        total_months = difference.years * 12 + difference.months
-        return max(int(total_months), 0)
+        if isinstance(review_date, datetime):
+            review_date = review_date.date()
+        delta = relativedelta(review_date, datetime.now().date())
+        months = delta.years * 12 + delta.months
+        return max(int(months), 0)
     except Exception:
         return pd.NA
 
-def style_css_for_months(next_review_months):
-    """Return inline CSS string for the row based on next_review_months."""
-    if pd.isna(next_review_months):
+def row_css(months):
+    if pd.isna(months):
         return ""
-    try:
-        v = int(next_review_months)
-    except Exception:
-        return ""
-    if v <= 0:
-        return "color: red; font-weight: bold;"
-    elif v < 4:
-        return "color: orange; font-weight: bold;"
-    elif v < 6:
-        return "color: green; font-weight: bold;"
+    m = int(months)
+    if m <= 0:
+        return "color:red;font-weight:bold;"
+    elif m < 4:
+        return "color:orange;font-weight:bold;"
+    elif m < 6:
+        return "color:green;font-weight:bold;"
     else:
-        return "color: blue; font-weight: bold;"
+        return "color:blue;font-weight:bold;"
 
 def email_to_name(email):
-    """Convert local-part 'john.doe@...' to 'John Doe'. If empty or invalid, return empty string."""
     if not email or not isinstance(email, str):
         return ""
-    # If email is actually a list (sometimes authored_by is a list), handle upstream; here assume string.
-    local_part = email.split('@')[0]
-    parts = local_part.split('.')
-    capitalized_parts = [p.capitalize() for p in parts if p]
-    return ' '.join(capitalized_parts)
+    local = email.split("@")[0]
+    return " ".join(p.capitalize() for p in local.split(".") if p)
 
-# --- Get GitHub token safely ---
-github_token = st.secrets.get("github_token")
-if not github_token:
-    st.error("GitHub token not found in Streamlit secrets (st.secrets['github_token']). Add it and reload.")
-    st.stop()
-
-headers = {'Authorization': f'token {github_token}'}
-api_url = 'https://api.github.com/repos/ebmdatalab/openprescribing/contents/openprescribing/measures/definitions'
-
-try:
-    res = requests.get(api_url, headers=headers, timeout=15)
-except Exception as e:
-    st.error(f"Network error while contacting GitHub API: {e}")
-    st.stop()
-
-if res.status_code != 200:
-    st.error(f"Failed to retrieve data from GitHub API (status code: {res.status_code}).")
-    st.stop()
-
-data = res.json()
-if not isinstance(data, list):
-    st.error("Unexpected data structure returned by the API.")
-    st.stop()
-
-normalized_data = []
-for item in data:
-    if not (isinstance(item, dict) and item.get('name', '').endswith('.json')):
-        continue
-    download_url = item.get('download_url')
-    if not download_url:
-        continue
+def measure_id_from_github_url(url):
+    if not url:
+        return None
     try:
-        file_res = requests.get(download_url, timeout=15)
-        file_res.raise_for_status()
-        file_data = file_res.json()
+        path = urlparse(url).path
+        filename = os.path.basename(path)
+        return os.path.splitext(filename)[0]
     except Exception:
-        # skip problematic files rather than failing the whole app
+        return None
+
+def plausible_pageviews(page_contains, period, site_id, api_key):
+    url = "https://plausible.io/api/v1/stats/aggregate"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "site_id": site_id,
+        "metrics": "pageviews",
+        "period": period,
+        "filters": f"event:page~={page_contains}",
+    }
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r.raise_for_status()
+        return int(r.json()["results"]["pageviews"]["value"] or 0)
+    except Exception:
+        return None
+
+# ----------------------------
+# Secrets
+# ----------------------------
+github_token = st.secrets.get("github_token")
+plausible_api_key = st.secrets.get("plausible_api_key")
+plausible_site_id = st.secrets.get("plausible_site_id")
+
+if not github_token:
+    st.error("Missing GitHub token")
+    st.stop()
+
+# ----------------------------
+# Fetch measures from GitHub
+# ----------------------------
+headers = {"Authorization": f"token {github_token}"}
+repo_url = (
+    "https://api.github.com/repos/"
+    "ebmdatalab/openprescribing/contents/"
+    "openprescribing/measures/definitions"
+)
+
+res = requests.get(repo_url, headers=headers, timeout=15)
+if res.status_code != 200:
+    st.error("Failed to fetch measure definitions")
+    st.stop()
+
+rows = []
+for item in res.json():
+    if not item.get("name", "").endswith(".json"):
         continue
 
-    table_id = item['name'].split('.')[0]
-    # authored_by / checked_by may be strings, lists, or missing
-    authored_by = file_data.get('authored_by', '')
-    if isinstance(authored_by, list) and authored_by:
-        authored_by = authored_by[0]
-    checked_by = file_data.get('checked_by', '')
-    if isinstance(checked_by, list) and checked_by:
-        checked_by = checked_by[0]
+    github_url = item.get("html_url")
+    measure_id = measure_id_from_github_url(github_url)
 
-    # Next review may be None, string, or list
-    next_review = file_data.get('next_review', None)
-    if isinstance(next_review, list) and next_review:
+    try:
+        data = requests.get(item["download_url"], timeout=10).json()
+    except Exception:
+        continue
+
+    authored_by = data.get("authored_by", "")
+    if isinstance(authored_by, list):
+        authored_by = authored_by[0] if authored_by else ""
+
+    checked_by = data.get("checked_by", "")
+    if isinstance(checked_by, list):
+        checked_by = checked_by[0] if checked_by else ""
+
+    next_review = data.get("next_review")
+    if isinstance(next_review, list):
         next_review = next_review[0]
     if isinstance(next_review, str):
         try:
-            # file uses YYYY-MM-DD per your earlier code
-            next_review = datetime.strptime(next_review, '%Y-%m-%d').date()
+            next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
         except Exception:
-            # leave as-is (will be string) and handle later
-            try:
-                next_review = datetime.fromisoformat(next_review).date()
-            except Exception:
-                next_review = None
-    elif isinstance(next_review, datetime):
-        next_review = next_review.date()
+            next_review = None
 
-    measure_name = file_data.get('name', '') or table_id
-    github_url = item.get('html_url', '')
+    rows.append({
+        "measure_name": data.get("name", measure_id),
+        "measure_id": measure_id,
+        "github_url": github_url,
+        "authored_by": email_to_name(authored_by),
+        "checked_by": email_to_name(checked_by),
+        "next_review": next_review,
+        "next_review_months": review_months(next_review),
+    })
 
-    months = review_months(next_review)
-    row = {
-        'measure_name': measure_name,
-        'authored_by': email_to_name(authored_by),
-        'checked_by': email_to_name(checked_by),
-        'next_review': next_review,
-        'github_url': github_url,
-        'next_review_months': months
-    }
-    normalized_data.append(row)
+df = pd.DataFrame(rows)
 
-# Sort by next_review, placing None at the end
-def sort_key(r):
-    nr = r.get('next_review')
-    if nr is None:
-        return datetime.max.date()
-    return nr
+# ----------------------------
+# Slider filter
+# ----------------------------
+valid_months = df["next_review_months"].dropna().astype(int)
+if not valid_months.empty:
+    min_m, max_m = valid_months.min(), valid_months.max()
+    rng = st.slider("Months until review", min_m, max_m, (min_m, max_m))
+    df = df[
+        df["next_review_months"].notna()
+        & (df["next_review_months"].astype(int) >= rng[0])
+        & (df["next_review_months"].astype(int) <= rng[1])
+    ]
 
-normalized_data = sorted(normalized_data, key=sort_key)
-df = pd.DataFrame(normalized_data)
-
-if df.empty:
-    st.info("No measure definitions found in the repository (or all were skipped).")
-    st.stop()
-
-# Provide a slider to filter by months until review.
-# Determine safe min/max values for slider using numeric months, ignoring pd.NA
-valid_months = df['next_review_months'][df['next_review_months'].notna()].astype(int) if 'next_review_months' in df.columns else pd.Series(dtype=int)
-if valid_months.empty:
-    # No numeric month values; show all and provide a disabled slider
-    st.info("No upcoming review dates found for the measures. Showing all entries.")
-    filtered_df = df.copy()
+# ----------------------------
+# Plausible enrichment
+# ----------------------------
+if plausible_api_key and plausible_site_id:
+    with st.spinner("Fetching Plausible pageviews…"):
+        df["views_30d"] = df["measure_id"].apply(
+            lambda m: plausible_pageviews(m, "30d", plausible_site_id, plausible_api_key)
+        )
+        df["views_12m"] = df["measure_id"].apply(
+            lambda m: plausible_pageviews(m, "12mo", plausible_site_id, plausible_api_key)
+        )
 else:
-    min_m = int(valid_months.min())
-    max_m = int(valid_months.max())
-    # If min == max, provide a single-value slider to show that point (Streamlit expects a tuple for range)
-    months_filter = st.slider(
-        'Select range of months until review',
-        min_value=min_m,
-        max_value=max_m,
-        value=(min_m, max_m)
-    )
-    filtered_df = df[
-        (df['next_review_months'].notna()) &
-        (df['next_review_months'].astype(int) >= months_filter[0]) &
-        (df['next_review_months'].astype(int) <= months_filter[1])
-    ].copy()
+    df["views_30d"] = None
+    df["views_12m"] = None
 
-# If slider filtered everything out, allow showing empty result message
-if filtered_df.empty:
-    st.warning("No measures match your filter. Try widening the months range or clear filters.")
-    # Still show full table below (optional). Here we'll show nothing further.
-    st.stop()
-
-# Build HTML table where measure_name is clickable and opens in a new tab.
-cols = [
-    ("measure_name", "Measure"),
-    ("authored_by", "Authored by"),
-    ("checked_by", "Checked by"),
-    ("next_review", "Next review"),
-    ("next_review_months", "Months to review")
+# ----------------------------
+# Render HTML table
+# ----------------------------
+headers = [
+    "Measure",
+    "Authored by",
+    "Checked by",
+    "Next review",
+    "Months to review",
+    "Views (30d)",
+    "Views (12m)",
 ]
 
-html_rows = []
-# Header
-header_cells = "".join(
-    f"<th style='text-align:left; padding:8px 12px; border-bottom:1px solid #ddd'>{hdr}</th>"
-    for _, hdr in cols
+html = []
+html.append("<tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr>")
+
+for _, r in df.iterrows():
+    css = row_css(r["next_review_months"])
+    link = (
+        f'<a href="{r["github_url"]}" target="_blank" '
+        f'style="color:inherit;text-decoration:underline;">'
+        f'{r["measure_name"]}</a>'
+    )
+    html.append(
+        "<tr>"
+        f'<td style="{css}">{link}</td>'
+        f'<td style="{css}">{r["authored_by"]}</td>'
+        f'<td style="{css}">{r["checked_by"]}</td>'
+        f'<td style="{css}">{r["next_review"] or ""}</td>'
+        f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
+        f'<td style="{css}">{r["views_30d"] or ""}</td>'
+        f'<td style="{css}">{r["views_12m"] or ""}</td>'
+        "</tr>"
+    )
+
+st.markdown(
+    f"""
+    <div style="overflow-x:auto">
+    <table style="border-collapse:collapse;width:100%">
+    {''.join(html)}
+    </table>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
-html_rows.append(f"<tr>{header_cells}</tr>")
-
-for _, r in filtered_df.iterrows():
-    css = style_css_for_months(r.get("next_review_months"))
-    nr = r.get("next_review")
-    nr_text = ""
-    if pd.notna(nr) and nr is not None:
-        try:
-            nr_text = nr.strftime("%Y-%m-%d")
-        except Exception:
-            nr_text = str(nr)
-    measure_html = (
-        f'<a href="{r.get("github_url", "#")}" '
-        f'target="_blank" rel="noopener noreferrer" '
-        f'style="color: inherit; text-decoration: underline;">'
-        f'{r.get("measure_name", "")}</a>'
-    )
-    cell_values = [
-        measure_html,
-        r.get("authored_by", "") or "",
-        r.get("checked_by", "") or "",
-        nr_text,
-        "" if pd.isna(r.get("next_review_months")) else str(int(r.get("next_review_months")))
-    ]
-    row_cells = "".join(
-        f"<td style='padding:8px 12px; border-bottom:1px solid #f2f2f2; {css}'>{val}</td>"
-        for val in cell_values
-    )
-    html_rows.append(f"<tr>{row_cells}</tr>")
-
-html_table = f"""
-<div style="overflow-x:auto;">
-<table style="border-collapse:collapse; width:100%; font-family:Arial, sans-serif;">
-{''.join(html_rows)}
-</table>
-</div>
-"""
-
-st.markdown(html_table, unsafe_allow_html=True)
-
-
