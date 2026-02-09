@@ -62,7 +62,6 @@ def measure_id_from_github_url(url):
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
     Fetches pageviews for pages containing /{measure_id}/ anywhere in the path.
-    Matches patterns like /measure/{measure_id}/, /pcn/XXX/{measure_id}/, etc.
     """
     if not measure_id:
         return None
@@ -70,11 +69,12 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     url = "https://plausible.io/api/v1/stats/aggregate"
     headers = {"Authorization": f"Bearer {api_key}"}
 
+    # Try using the pipe separator syntax
     params = {
         "site_id": site_id,
         "metrics": "pageviews",
         "period": period,
-        "filters": f"event:page~=/{measure_id}/",
+        "filters": f"event:page==|/{measure_id}/",  # Changed to ==| syntax
     }
 
     try:
@@ -84,12 +84,11 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         value = response["results"]["pageviews"]["value"]
         result = int(float(value)) if value is not None else 0
         
-        # Debug output for first few
+        # Debug output
         if measure_id in ["carbon_salbutamol", "aafpercent", "all_antibiotics"]:
             st.write(f"DEBUG {measure_id} ({period}):")
-            st.write(f"  Filter: event:page~=/{measure_id}/")
+            st.write(f"  Filter: {params['filters']}")
             st.write(f"  Result: {result}")
-            st.write(f"  Full response: {response}")
         
         return result
     except Exception as e:
