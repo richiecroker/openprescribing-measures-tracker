@@ -80,11 +80,21 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     try:
         r = requests.get(url, headers=headers, params=params, timeout=10)
         r.raise_for_status()
-        value = r.json()["results"]["pageviews"]["value"]
-        return int(float(value)) if value is not None else 0
-    except Exception:
+        response = r.json()
+        value = response["results"]["pageviews"]["value"]
+        result = int(float(value)) if value is not None else 0
+        
+        # Debug output for first few
+        if measure_id in ["carbon_salbutamol", "aafpercent", "all_antibiotics"]:
+            st.write(f"DEBUG {measure_id} ({period}):")
+            st.write(f"  Filter: event:page~=/{measure_id}/")
+            st.write(f"  Result: {result}")
+            st.write(f"  Full response: {response}")
+        
+        return result
+    except Exception as e:
+        st.write(f"ERROR: {measure_id}, {e}")
         return None
-
 # ----------------------------
 # Secrets
 # ----------------------------
