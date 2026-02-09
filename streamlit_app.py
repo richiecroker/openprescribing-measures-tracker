@@ -61,7 +61,7 @@ def measure_id_from_github_url(url):
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Fetches pageviews for pages containing /{measure_id}/ anywhere in the path.
+    Fetches pageviews for pages containing the measure_id in the path.
     """
     if not measure_id:
         return None
@@ -69,12 +69,12 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     url = "https://plausible.io/api/v1/stats/aggregate"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Try using the pipe separator syntax
+    # Try using the starts with operator (^) or just the measure_id
     params = {
         "site_id": site_id,
         "metrics": "pageviews",
         "period": period,
-        "filters": f"event:page==|/{measure_id}/",  # Changed to ==| syntax
+        "filters": f"event:page~=**/{measure_id}/**",  # Try wildcard syntax
     }
 
     try:
