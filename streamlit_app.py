@@ -61,40 +61,39 @@ def measure_id_from_github_url(url):
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Fetches pageviews for pages containing the measure_id in the path.
+    Fetches pageviews for pages containing the measure_id in the path using API v2.
     """
     if not measure_id:
         return None
 
-    url = "https://plausible.io/api/v1/stats/aggregate"
+    url = "https://plausible.io/api/v2/query"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Try multiple filters with OR logic - match any URL pattern containing the measure
-    # Using contains with just the measure_id and slash
-    filter_str = f"event:page==/{measure_id}/"
-    
-    params = {
+    # v2 API uses JSON body instead of query params
+    payload = {
         "site_id": site_id,
-        "metrics": "pageviews",
-        "period": period,
-        "filters": filter_str,
+        "metrics": ["pageviews"],
+        "date_range": period,
+        "filters": [
+            ["contains", "event:page", [f"/{measure_id}/"]]
+        ]
     }
 
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = requests.post(url, headers=headers, json=payload, timeout=10)
         r.raise_for_status()
         response = r.json()
         
         # Debug output
         if measure_id in ["carbon_salbutamol", "aafpercent", "all_antibiotics"]:
             st.write(f"DEBUG {measure_id} ({period}):")
-            st.write(f"  URL sent: {r.url}")  # See the actual URL sent
+            st.write(f"  Payload: {payload}")
             st.write(f"  Response: {response}")
         
-        value = response["results"]["pageviews"]["value"]
-        result = int(float(value)) if value is not None else 0
+        # v2 response structure is different
+        result = response["results"][0]["metrics"][0] if response.get("results") else 0
+        return int(result) if result is not None else 0
         
-        return result
     except Exception as e:
         st.write(f"ERROR: {measure_id}, {e}")
         return None
