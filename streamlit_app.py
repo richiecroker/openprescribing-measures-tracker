@@ -69,26 +69,30 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     url = "https://plausible.io/api/v1/stats/aggregate"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Try using the starts with operator (^) or just the measure_id
+    # Try multiple filters with OR logic - match any URL pattern containing the measure
+    # Using contains with just the measure_id and slash
+    filter_str = f"event:page==/{measure_id}/"
+    
     params = {
         "site_id": site_id,
         "metrics": "pageviews",
         "period": period,
-        "filters": f"event:page~=**/{measure_id}/**",  # Try wildcard syntax
+        "filters": filter_str,
     }
 
     try:
         r = requests.get(url, headers=headers, params=params, timeout=10)
         r.raise_for_status()
         response = r.json()
-        value = response["results"]["pageviews"]["value"]
-        result = int(float(value)) if value is not None else 0
         
         # Debug output
         if measure_id in ["carbon_salbutamol", "aafpercent", "all_antibiotics"]:
             st.write(f"DEBUG {measure_id} ({period}):")
-            st.write(f"  Filter: {params['filters']}")
-            st.write(f"  Result: {result}")
+            st.write(f"  URL sent: {r.url}")  # See the actual URL sent
+            st.write(f"  Response: {response}")
+        
+        value = response["results"]["pageviews"]["value"]
+        result = int(float(value)) if value is not None else 0
         
         return result
     except Exception as e:
