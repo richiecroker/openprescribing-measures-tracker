@@ -204,10 +204,6 @@ else:
     df["views_30d"] = None
     df["views_12m"] = None
 
-# Add cache info
-if plausible_api_key and plausible_site_id:
-    st.caption("ℹ️ Pageview data is cached for 7 days. Click 'Clear cache' in the menu (⋮) to force refresh.")
-
 # ----------------------------
 # Sort controls
 # ----------------------------
