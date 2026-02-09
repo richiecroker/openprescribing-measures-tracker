@@ -199,7 +199,7 @@ if plausible_api_key and plausible_site_id:
         
         # Apply to dataframe
         df["views_30d"] = df["measure_id"].apply(lambda m: int(pageviews_dict.get(m, (0, 0))[0]) if pageviews_dict.get(m, (0, 0))[0] is not None else None)
-        df["views_12m"] = df["measure_id"].apply(lambda m: int(pageviews_dict.get(m, (0, 0))[1]) if pageviews_dict.get(m, (0, 0))[1] is not None else None)None))[1])
+        df["views_12m"] = df["measure_id"].apply(lambda m: int(pageviews_dict.get(m, (0, 0))[1]) if pageviews_dict.get(m, (0, 0))[1] is not None else None)
 else:
     df["views_30d"] = None
     df["views_12m"] = None
