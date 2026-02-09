@@ -198,7 +198,9 @@ for _, r in filtered_df.iterrows():
         except Exception:
             nr_text = str(nr)
     measure_html = (
-        f'<a href="{r.get("github_url", "#")}" target="_blank" rel="noopener noreferrer">'
+        f'<a href="{r.get("github_url", "#")}" '
+        f'target="_blank" rel="noopener noreferrer" '
+        f'style="color: inherit; text-decoration: underline;">'
         f'{r.get("measure_name", "")}</a>'
     )
     cell_values = [
