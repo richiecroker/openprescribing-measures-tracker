@@ -231,6 +231,22 @@ df = df.sort_values(
 )
 
 # ----------------------------
+# Display total pageviews
+# ----------------------------
+total_views_30d = df["views_30d"].sum() if "views_30d" in df.columns else 0
+total_views_12m = df["views_12m"].sum() if "views_12m" in df.columns else 0
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Total Measures", len(df))
+with col2:
+    st.metric("Total Views (30 days)", f"{int(total_views_30d):,}" if pd.notna(total_views_30d) else "N/A")
+with col3:
+    st.metric("Total Views (12 months)", f"{int(total_views_12m):,}" if pd.notna(total_views_12m) else "N/A")
+
+st.markdown("---")
+
+# ----------------------------
 # Render HTML table
 # ----------------------------
 cols = [
