@@ -84,7 +84,8 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         result = int(float(value)) if value is not None else 0
         st.write(f"DEBUG: measure_id={measure_id}, period={period}, result={result}")
         return result
-    except Exception:
+    except Exception as e:
+        st.write(f"ERROR in plausible_pageviews: {measure_id}, {e}")
         return None
 
 # ----------------------------
@@ -93,6 +94,10 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
 github_token = st.secrets.get("github_token")
 plausible_api_key = st.secrets.get("plausible_api_key")
 plausible_site_id = st.secrets.get("plausible_site_id")
+
+st.write(f"DEBUG: github_token exists: {bool(github_token)}")
+st.write(f"DEBUG: plausible_api_key exists: {bool(plausible_api_key)}")
+st.write(f"DEBUG: plausible_site_id: {plausible_site_id}")
 
 if not github_token:
     st.error("Missing GitHub token")
@@ -108,10 +113,13 @@ repo_url = (
     "openprescribing/measures/definitions"
 )
 
+st.write("DEBUG: Fetching from GitHub...")
 res = requests.get(repo_url, headers=headers, timeout=15)
 if res.status_code != 200:
     st.error("Failed to fetch measure definitions")
     st.stop()
+
+st.write(f"DEBUG: Got {len(res.json())} items from GitHub")
 
 rows = []
 for item in res.json():
@@ -120,3 +128,119 @@ for item in res.json():
 
     github_url = item.get("html_url")
     measure_id = measure_id_from_github_url(github_url)
+
+    try:
+        data = requests.get(item["download_url"], timeout=10).json()
+    except Exception:
+        continue
+
+    authored_by = data.get("authored_by", "")
+    if isinstance(authored_by, list):
+        authored_by = authored_by[0] if authored_by else ""
+
+    checked_by = data.get("checked_by", "")
+    if isinstance(checked_by, list):
+        checked_by = checked_by[0] if checked_by else ""
+
+    next_review = data.get("next_review")
+    if isinstance(next_review, list):
+        next_review = next_review[0]
+    if isinstance(next_review, str):
+        try:
+            next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
+        except Exception:
+            next_review = None
+
+    rows.append({
+        "measure_name": data.get("name", measure_id),
+        "measure_id": measure_id,
+        "github_url": github_url,
+        "authored_by": email_to_name(authored_by),
+        "checked_by": email_to_name(checked_by),
+        "next_review": next_review,
+        "next_review_months": review_months(next_review),
+    })
+
+df = pd.DataFrame(rows)
+st.write(f"DEBUG: Created dataframe with {len(df)} rows")
+
+# ----------------------------
+# Slider filter (UNCHANGED)
+# ----------------------------
+valid_months = df["next_review_months"].dropna().astype(int)
+if not valid_months.empty:
+    min_m, max_m = valid_months.min(), valid_months.max()
+    rng = st.slider("Months until review", min_m, max_m, (min_m, max_m))
+    df = df[
+        df["next_review_months"].notna()
+        & (df["next_review_months"].astype(int) >= rng[0])
+        & (df["next_review_months"].astype(int) <= rng[1])
+    ]
+
+st.write(f"DEBUG: After filtering, {len(df)} rows")
+
+# ----------------------------
+# Plausible enrichment (WITH DEBUG)
+# ----------------------------
+if plausible_api_key and plausible_site_id:
+    st.write("DEBUG: Starting Plausible enrichment...")
+    with st.spinner("Fetching Plausible pageviews…"):
+        df["views_30d"] = df["measure_id"].apply(
+            lambda m: plausible_pageviews(m, "30d", plausible_site_id, plausible_api_key)
+        )
+        df["views_12m"] = df["measure_id"].apply(
+            lambda m: plausible_pageviews(m, "12mo", plausible_site_id, plausible_api_key)
+        )
+else:
+    st.write("DEBUG: Skipping Plausible (no API key/site_id)")
+    df["views_30d"] = None
+    df["views_12m"] = None
+
+st.write("DEBUG: Plausible enrichment complete")
+st.write(df.head())
+
+# ----------------------------
+# Render HTML table (UNCHANGED)
+# ----------------------------
+cols = [
+    ("measure_name", "Measure"),
+    ("authored_by", "Authored by"),
+    ("checked_by", "Checked by"),
+    ("next_review", "Next review"),
+    ("next_review_months", "Months to review"),
+    ("views_30d", "Views (30d)"),
+    ("views_12m", "Views (12m)"),
+]
+
+html = []
+html.append("<tr>" + "".join(f"<th>{label}</th>" for _, label in cols) + "</tr>")
+
+for _, r in df.iterrows():
+    css = row_css(r["next_review_months"])
+    link = (
+        f'<a href="{r["github_url"]}" target="_blank" '
+        f'style="color:inherit;text-decoration:underline;">'
+        f'{r["measure_name"]}</a>'
+    )
+    html.append(
+        "<tr>"
+        f'<td style="{css}">{link}</td>'
+        f'<td style="{css}">{r["authored_by"]}</td>'
+        f'<td style="{css}">{r["checked_by"]}</td>'
+        f'<td style="{css}">{r["next_review"] or ""}</td>'
+        f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
+        f'<td style="{css}">{r["views_30d"] or ""}</td>'
+        f'<td style="{css}">{r["views_12m"] or ""}</td>'
+        "</tr>"
+    )
+
+st.markdown(
+    f"""
+    <div style="overflow-x:auto">
+    <table style="border-collapse:collapse;width:100%">
+    {''.join(html)}
+    </table>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
