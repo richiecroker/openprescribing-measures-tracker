@@ -57,11 +57,12 @@ def measure_id_from_github_url(url):
         return None
 
 # ----------------------------
-# Plausible helper
+# Plausible helper (FIXED - v2 API)
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
     """
-    Fetches pageviews for pages containing the measure_id in the path using API v2.
+    Fetches pageviews for pages containing the measure_id in the path using Plausible API v2.
+    Matches patterns like /measure/{measure_id}/, /pcn/XXX/{measure_id}/, etc.
     """
     if not measure_id:
         return None
@@ -69,7 +70,6 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     url = "https://plausible.io/api/v2/query"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # v2 API uses JSON body instead of query params
     payload = {
         "site_id": site_id,
         "metrics": ["pageviews"],
@@ -83,20 +83,11 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
         r = requests.post(url, headers=headers, json=payload, timeout=10)
         r.raise_for_status()
         response = r.json()
-        
-        # Debug output
-        if measure_id in ["carbon_salbutamol", "aafpercent", "all_antibiotics"]:
-            st.write(f"DEBUG {measure_id} ({period}):")
-            st.write(f"  Payload: {payload}")
-            st.write(f"  Response: {response}")
-        
-        # v2 response structure is different
         result = response["results"][0]["metrics"][0] if response.get("results") else 0
         return int(result) if result is not None else 0
-        
-    except Exception as e:
-        st.write(f"ERROR: {measure_id}, {e}")
+    except Exception:
         return None
+
 # ----------------------------
 # Secrets
 # ----------------------------
