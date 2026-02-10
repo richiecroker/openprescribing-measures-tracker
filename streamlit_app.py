@@ -88,18 +88,19 @@ def plausible_pageviews(measure_id, period, site_id, api_key):
     except Exception:
         return None
 
-def plausible_pageviews_pattern(prefix, period, site_id, api_key):
+def plausible_pageviews_pattern(prefix, period, site_id, api_key, exact=False):
     """Fetch pageviews for URLs matching prefix AND containing /measures/"""
     url = "https://plausible.io/api/v2/query"
     headers = {"Authorization": f"Bearer {api_key}"}
+    filter_op = "is" if exact else "contains"
+    filters = [[filter_op, "event:page", [prefix]]]
+    if not exact:
+        filters.append(["contains", "event:page", ["/measures/"]])
     payload = {
         "site_id": site_id,
         "metrics": ["pageviews"],
         "date_range": period,
-        "filters": [
-            ["contains", "event:page", [prefix]],
-            ["contains", "event:page", ["/measures/"]],
-        ]
+        "filters": filters,
     }
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=10)
@@ -126,18 +127,23 @@ def fetch_all_pageviews(measure_ids, site_id, api_key):
         results[measure_id] = (views_30d, views_12m)
     return results
 
-ORG_TYPES = ["practice", "pcn", "sicbl", "icb", "regional-team", "england"]
+ORG_TYPES = ["practice", "pcn", "sicbl", "icb", "regional-team", "national/england"]
 
 @st.cache_data(ttl=2592000)  # Cache for 30 days
 def fetch_orgtypes_pageviews(site_id, api_key):
     """
     Fetch pageviews for /{org_type}/{org}/measures/ URL patterns, grouped by org_type.
+    national/england is matched exactly since it has no /measures/ subpath.
     Cached for 30 days.
     """
     results = {}
     for org_type in ORG_TYPES:
-        views_30d = plausible_pageviews_pattern(f"/{org_type}/", "30d", site_id, api_key)
-        views_12m = plausible_pageviews_pattern(f"/{org_type}/", "12mo", site_id, api_key)
+        if org_type == "national/england":
+            views_30d = plausible_pageviews_pattern("/national/england/", "30d", site_id, api_key, exact=True)
+            views_12m = plausible_pageviews_pattern("/national/england/", "12mo", site_id, api_key, exact=True)
+        else:
+            views_30d = plausible_pageviews_pattern(f"/{org_type}/", "30d", site_id, api_key)
+            views_12m = plausible_pageviews_pattern(f"/{org_type}/", "12mo", site_id, api_key)
         results[org_type] = (views_30d, views_12m)
     return results
 
@@ -304,6 +310,8 @@ if plausible_api_key and plausible_site_id:
         """,
         unsafe_allow_html=True,
     )
+
+st.markdown("---")
 
 # ----------------------------
 # Render HTML table
