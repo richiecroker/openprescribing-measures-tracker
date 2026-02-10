@@ -288,28 +288,17 @@ if plausible_api_key and plausible_site_id:
     with st.spinner("Fetching org-type pageviews…"):
         orgtype_views = fetch_orgtypes_pageviews(plausible_site_id, plausible_api_key)
 
-    org_rows = []
-    for org_type in ORG_TYPES:
+    org_cols = st.columns(len(ORG_TYPES))
+    for col, org_type in zip(org_cols, ORG_TYPES):
         v30, v12 = orgtype_views.get(org_type, (None, None))
-        org_rows.append(
-            f"<tr>"
-            f"<td><strong>{org_type}</strong></td>"
-            f"<td>{f'{v30:,}' if v30 is not None else 'N/A'}</td>"
-            f"<td>{f'{v12:,}' if v12 is not None else 'N/A'}</td>"
-            f"</tr>"
+        col.metric(
+            org_type,
+            f"{v30:,}" if v30 is not None else "N/A",
         )
-
-    st.markdown(
-        f"""
-        <table style="border-collapse:collapse;margin-bottom:1rem;">
-        <tr><th style="text-align:left;padding-right:2rem;">Org type</th>
-            <th style="text-align:right;padding-right:2rem;">Views (30d)</th>
-            <th style="text-align:right;">Views (12m)</th></tr>
-        {''.join(org_rows)}
-        </table>
-        """,
-        unsafe_allow_html=True,
-    )
+        col.metric(
+            "12m",
+            f"{v12:,}" if v12 is not None else "N/A",
+        )
 
 st.markdown("---")
 
