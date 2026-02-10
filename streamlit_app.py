@@ -126,7 +126,7 @@ def fetch_all_pageviews(measure_ids, site_id, api_key):
         results[measure_id] = (views_30d, views_12m)
     return results
 
-ORG_TYPES = ["practice", "pcn", "sicbl", "icb", "regional_team", "all_england"]
+ORG_TYPES = ["practice", "pcn", "sicbl", "icb", "regional-team", "england"]
 
 @st.cache_data(ttl=2592000)  # Cache for 30 days
 def fetch_orgtypes_pageviews(site_id, api_key):
@@ -282,18 +282,28 @@ if plausible_api_key and plausible_site_id:
     with st.spinner("Fetching org-type pageviews…"):
         orgtype_views = fetch_orgtypes_pageviews(plausible_site_id, plausible_api_key)
 
-    st.markdown("**Views by org type** (`/{org_type}/{org}/measures/`)")
-    org_cols = st.columns(len(ORG_TYPES))
-    for col, org_type in zip(org_cols, ORG_TYPES):
+    org_rows = []
+    for org_type in ORG_TYPES:
         v30, v12 = orgtype_views.get(org_type, (None, None))
-        col.metric(
-            org_type,
-            f"{v30:,}" if v30 is not None else "N/A",
-            delta=f"{v12:,} (12m)" if v12 is not None else None,
-            delta_color="off",
+        org_rows.append(
+            f"<tr>"
+            f"<td><strong>{org_type}</strong></td>"
+            f"<td>{f'{v30:,}' if v30 is not None else 'N/A'}</td>"
+            f"<td>{f'{v12:,}' if v12 is not None else 'N/A'}</td>"
+            f"</tr>"
         )
 
-st.markdown("---")
+    st.markdown(
+        f"""
+        <table style="border-collapse:collapse;margin-bottom:1rem;">
+        <tr><th style="text-align:left;padding-right:2rem;">Org type</th>
+            <th style="text-align:right;padding-right:2rem;">Views (30d)</th>
+            <th style="text-align:right;">Views (12m)</th></tr>
+        {''.join(org_rows)}
+        </table>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ----------------------------
 # Render HTML table
