@@ -12,6 +12,11 @@ import os
 st.set_page_config(layout="wide")
 st.title("OpenPrescribing measures tracker")
 
+#calculate date range for Plausible 
+today = date.today()
+year_ago = today.replace(year=today.year - 1)
+last_12m = [str(year_ago), str(today)]
+
 # ----------------------------
 # Helpers
 # ----------------------------
@@ -120,10 +125,15 @@ def fetch_all_pageviews(measure_ids, site_id, api_key):
     Fetch pageviews for all measures. Cached for 30 days.
     Returns a dict with measure_id as key and tuple of (views_30d, views_12m) as value.
     """
+    #calculate date range for Plausible 
+    today = date.today()
+    year_ago = today.replace(year=today.year - 1)
+    date_range = [str(year_ago), str(today)]
+    
     results = {}
     for measure_id in measure_ids:
         views_30d = plausible_pageviews(measure_id, "30d", site_id, api_key)
-        views_12m = plausible_pageviews(measure_id, "12mo", site_id, api_key)
+        views_12m = plausible_pageviews(measure_id, last_12m, site_id, api_key)
         results[measure_id] = (views_30d, views_12m)
     return results
 
@@ -140,10 +150,10 @@ def fetch_orgtypes_pageviews(site_id, api_key):
     for org_type in ORG_TYPES:
         if org_type == "national/england":
             views_30d = plausible_pageviews_pattern("/national/england/", "30d", site_id, api_key, exact=True)
-            views_12m = plausible_pageviews_pattern("/national/england/", "12mo", site_id, api_key, exact=True)
+            views_12m = plausible_pageviews_pattern("/national/england/", last_12m, site_id, api_key, exact=True)
         else:
             views_30d = plausible_pageviews_pattern(f"/{org_type}/", "30d", site_id, api_key)
-            views_12m = plausible_pageviews_pattern(f"/{org_type}/", "12mo", site_id, api_key)
+            views_12m = plausible_pageviews_pattern(f"/{org_type}/", last_12m, site_id, api_key)
         results[org_type] = (views_30d, views_12m)
     return results
 
