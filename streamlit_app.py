@@ -180,9 +180,9 @@ repo_url = (
 
 res = requests.get(repo_url, headers=headers, timeout=15)
 if res.status_code != 200:
-    st.error("Failed to fetch measure definitions")
+    st.error(f"Failed to fetch measure definitions: {res.status_code} — {res.text}")
     st.stop()
-
+    
 rows = []
 for item in res.json():
     if not item.get("name", "").endswith(".json"):
