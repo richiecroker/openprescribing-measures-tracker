@@ -76,10 +76,19 @@ def extract_hrefs(value):
         for v in value:
             yield from extract_hrefs(v)
 
+LINK_CHECK_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-GB,en;q=0.9",
+}
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def check_url(url, timeout=10.0):
     """Check a single URL. Cached for 24h so reruns/filters don't re-hit the network."""
-    headers = {"User-Agent": "Mozilla/5.0 (link-checker)"}
+    headers = LINK_CHECK_HEADERS
     try:
         resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
         if resp.status_code >= 400 or resp.status_code == 405:
