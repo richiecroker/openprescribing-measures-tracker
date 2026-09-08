@@ -64,6 +64,49 @@ def measure_id_from_github_url(url):
         return None
 
 # ----------------------------
+# Link-checking helpers
+# ----------------------------
+HREF_RE = re.compile(r"href\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
+
+def extract_hrefs(value):
+    """Yield every href='...' URL found in a string or list of strings."""
+    if isinstance(value, str):
+        yield from HREF_RE.findall(value)
+    elif isinstance(value, list):
+        for v in value:
+            yield from extract_hrefs(v)
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def check_url(url, timeout=10.0):
+    """Check a single URL. Cached for 24h so reruns/filters don't re-hit the network."""
+    headers = {"User-Agent": "Mozilla/5.0 (link-checker)"}
+    try:
+        resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
+        if resp.status_code >= 400 or resp.status_code == 405:
+            resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True, stream=True)
+        return (str(resp.status_code), "OK" if resp.status_code < 400 else "Error")
+    except requests.exceptions.SSLError as e:
+        return ("SSL_ERROR", str(e))
+    except requests.exceptions.ConnectionError as e:
+        return ("CONN_ERROR", str(e))
+    except requests.exceptions.Timeout:
+        return ("TIMEOUT", "Request timed out")
+    except requests.exceptions.RequestException as e:
+        return ("REQUEST_ERROR", str(e))
+
+def check_urls(urls, max_workers=10):
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {executor.submit(check_url, u): u for u in urls}
+        for future in as_completed(future_to_url):
+            u = future_to_url[future]
+            try:
+                results[u] = future.result()
+            except Exception as e:
+                results[u] = ("UNKNOWN_ERROR", str(e))
+    return results
+
+# ----------------------------
 # Plausible helpers
 # ----------------------------
 def plausible_pageviews(measure_id, period, site_id, api_key):
@@ -186,6 +229,8 @@ if res.status_code != 200:
     st.stop()
     
 rows = []
+link_hits = {}  # url -> set of measure names it was found in
+
 for item in res.json():
     if not item.get("name", "").endswith(".json"):
         continue
@@ -215,8 +260,16 @@ for item in res.json():
         except Exception:
             next_review = None
 
+    measure_name = data.get("name", measure_id)
+
+    # Pull out any href='...' links from the why_it_matters field so we can
+    # check them below.
+    for url in extract_hrefs(data.get("why_it_matters")):
+        url = url.strip()
+        link_hits.setdefault(url, set()).add(measure_name)
+
     rows.append({
-        "measure_name": data.get("name", measure_id),
+        "measure_name": measure_name,
         "measure_id": measure_id,
         "github_url": github_url,
         "authored_by": email_to_name(authored_by),
@@ -359,3 +412,45 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# ----------------------------
+# Link check table (beneath the measures table)
+# ----------------------------
+st.markdown("---")
+st.subheader("Links referenced in measure definitions")
+
+if link_hits:
+    with st.spinner(f"Checking {len(link_hits)} link(s)…"):
+        link_results = check_urls(list(link_hits.keys()))
+
+    link_rows = []
+    for url, measures in link_hits.items():
+        status, detail = link_results.get(url, ("?", ""))
+        link_rows.append({
+            "url": url,
+            "status": status,
+            "detail": detail,
+            "found_in": ", ".join(sorted(measures)),
+        })
+
+    link_df = pd.DataFrame(link_rows)
+
+    def _link_ok(status):
+        return status.isdigit() and status.startswith(("2", "3"))
+
+    n_ok = sum(1 for r in link_rows if _link_ok(r["status"]))
+    n_bad = len(link_rows) - n_ok
+
+    lcol1, lcol2, lcol3 = st.columns(3)
+    lcol1.metric("Total links", len(link_rows))
+    lcol2.metric("OK", n_ok)
+    lcol3.metric("Broken / errored", n_bad)
+
+    link_df = link_df.sort_values(by="status", key=lambda s: s.astype(str))
+
+    st.dataframe(link_df, use_container_width=True, hide_index=True)
+
+    csv = link_df.to_csv(index=False).encode("utf-8")
+    st.download_button("Download link check results as CSV", csv, "measure_link_check.csv", "text/csv")
+else:
+    st.info("No links found in the measure definitions currently loaded.")
