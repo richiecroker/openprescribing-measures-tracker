@@ -252,6 +252,7 @@ if res.status_code != 200:
     
 rows = []
 link_hits = {}  # url -> set of measure names it was found in
+measure_links = {}  # measure name -> list of urls found in its why_it_matters
 
 for item in res.json():
     if not item.get("name", "").endswith(".json"):
@@ -289,6 +290,7 @@ for item in res.json():
     for url in extract_hrefs(data.get("why_it_matters")):
         url = url.strip()
         link_hits.setdefault(url, set()).add(measure_name)
+        measure_links.setdefault(measure_name, []).append(url)
 
     rows.append({
         "measure_name": measure_name,
@@ -301,6 +303,31 @@ for item in res.json():
     })
 
 df = pd.DataFrame(rows)
+
+# ----------------------------
+# Check links (needed for the broken/unverified count columns below,
+# and reused later for the link table)
+# ----------------------------
+if link_hits:
+    with st.spinner(f"Checking {len(link_hits)} link(s)…"):
+        link_results = check_urls(list(link_hits.keys()))
+else:
+    link_results = {}
+
+def _count_link_statuses(urls):
+    broken = 0
+    unverified = 0
+    for u in urls:
+        status, _ = link_results.get(u, ("?", ""))
+        if status == "BLOCKED":
+            unverified += 1
+        elif not (status.isdigit() and status.startswith(("2", "3"))):
+            broken += 1
+    return broken, unverified
+
+_link_counts = df["measure_name"].apply(lambda m: _count_link_statuses(measure_links.get(m, [])))
+df["broken_links"] = _link_counts.apply(lambda t: t[0])
+df["unverified_links"] = _link_counts.apply(lambda t: t[1])
 
 # ----------------------------
 # Slider filter
@@ -400,6 +427,8 @@ cols = [
     ("next_review_months", "Months to review"),
     ("views_30d", "Views (30d)"),
     ("views_12m", "Views (12m)"),
+    ("broken_links", "Broken links"),
+    ("unverified_links", "Unverified links"),
 ]
 
 html = []
@@ -412,6 +441,8 @@ for _, r in df.iterrows():
         f'style="color:inherit;text-decoration:underline;">'
         f'{r["measure_name"]}</a>'
     )
+    broken_css = "color:red;font-weight:bold;" if r["broken_links"] > 0 else ""
+    unverified_css = "color:orange;font-weight:bold;" if r["unverified_links"] > 0 else ""
     html.append(
         "<tr>"
         f'<td style="{css}">{link}</td>'
@@ -421,6 +452,8 @@ for _, r in df.iterrows():
         f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
         f'<td style="{css}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
         f'<td style="{css}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
+        f'<td style="{broken_css}">{r["broken_links"]}</td>'
+        f'<td style="{unverified_css}">{r["unverified_links"]}</td>'
         "</tr>"
     )
 
@@ -442,9 +475,6 @@ st.markdown("---")
 st.subheader("Links referenced in measure definitions")
 
 if link_hits:
-    with st.spinner(f"Checking {len(link_hits)} link(s)…"):
-        link_results = check_urls(list(link_hits.keys()))
-
     link_rows = []
     for url, measures in link_hits.items():
         status, detail = link_results.get(url, ("?", ""))
