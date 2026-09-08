@@ -446,6 +446,13 @@ cols = [
     ("unverified_links", "Unverified links"),
 ]
 
+# Columns listed here get white-space:nowrap so their content never wraps
+# onto a second line — the browser widens the column to fit instead.
+NOWRAP_COLUMNS = {"next_review"}
+ 
+def _th_style(key):
+    return "white-space:nowrap;" if key in NOWRAP_COLUMNS else ""
+    
 html = []
 html.append("<tr>" + "".join(f"<th>{label}</th>" for _, label in cols) + "</tr>")
 
@@ -471,9 +478,9 @@ for _, r in df.iterrows():
     html.append(
         "<tr>"
         f'<td style="{css}">{link}</td>'
-        f'<td style="{css}">{r["authored_by"]}</td>'
-        f'<td style="{css}">{r["checked_by"]}</td>'
-        f'<td style="{css}">{r["next_review"] or ""}</td>'
+        f'<td style="{css}{nowrap("authored_by")}">{r["authored_by"]}</td>'
+        f'<td style="{css}{nowrap("checked_by")}">{r["checked_by"]}</td>'
+        f'<td style="{css}{nowrap("next_review")}">{r["next_review"] or ""}</td>'
         f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
         f'<td style="{css}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
         f'<td style="{css}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
