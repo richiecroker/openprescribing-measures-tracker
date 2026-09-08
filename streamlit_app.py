@@ -468,6 +468,7 @@ def _links_popup(urls, color):
 
 for _, r in df.iterrows():
     css = row_css(r["next_review_months"])
+    nowrap = lambda key: "white-space:nowrap;" if key in NOWRAP_COLUMNS else ""
     link = (
         f'<a href="{r["github_url"]}" target="_blank" '
         f'style="color:inherit;text-decoration:underline;">'
@@ -477,15 +478,15 @@ for _, r in df.iterrows():
     unverified_cell = _links_popup(r["unverified_urls"], "orange")
     html.append(
         "<tr>"
-        f'<td style="{css}">{link}</td>'
+        f'<td style="{css}{nowrap("measure_name")}">{link}</td>'
         f'<td style="{css}{nowrap("authored_by")}">{r["authored_by"]}</td>'
         f'<td style="{css}{nowrap("checked_by")}">{r["checked_by"]}</td>'
         f'<td style="{css}{nowrap("next_review")}">{r["next_review"] or ""}</td>'
-        f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
-        f'<td style="{css}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
-        f'<td style="{css}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
-        f'<td>{broken_cell}</td>'
-        f'<td>{unverified_cell}</td>'
+        f'<td style="{css}{nowrap("next_review_months")}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
+        f'<td style="{css}{nowrap("views_30d")}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
+        f'<td style="{css}{nowrap("views_12m")}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
+        f'<td style="{nowrap("broken_links")}">{broken_cell}</td>'
+        f'<td style="{nowrap("unverified_links")}">{unverified_cell}</td>'
         "</tr>"
     )
 
