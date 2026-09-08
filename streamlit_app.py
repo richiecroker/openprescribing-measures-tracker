@@ -448,7 +448,7 @@ cols = [
 
 # Columns listed here get white-space:nowrap so their content never wraps
 # onto a second line — the browser widens the column to fit instead.
-NOWRAP_COLUMNS = {"next_review"}
+NOWRAP_COLUMNS = {"next_review", "authored_by", "checked_by"}
  
 def _th_style(key):
     return "white-space:nowrap;" if key in NOWRAP_COLUMNS else ""
