@@ -344,6 +344,10 @@ if not valid_months.empty:
         & (df["next_review_months"].astype(int) <= rng[1])
     ]
 
+only_link_issues = st.checkbox("Only show measures with broken or unverified links")
+if only_link_issues:
+    df = df[(df["broken_links"] > 0) | (df["unverified_links"] > 0)]
+
 # ----------------------------
 # Plausible enrichment (CACHED)
 # ----------------------------
