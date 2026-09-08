@@ -236,77 +236,86 @@ if not github_token:
     st.stop()
 
 # ----------------------------
-# Fetch measures from GitHub
+# Fetch measures from GitHub (cached so widget interactions don't
+# re-download every measure file on every rerun)
 # ----------------------------
-headers = {"Authorization": f"token {github_token}"}
-repo_url = (
-    "https://api.github.com/repos/"
-    "ebmdatalab/openprescribing/contents/"
-    "openprescribing/measures/definitions"
-)
+@st.cache_data(ttl=1800, show_spinner="Fetching measure definitions from GitHub…")
+def fetch_measures_and_links(github_token):
+    headers = {"Authorization": f"token {github_token}"}
+    repo_url = (
+        "https://api.github.com/repos/"
+        "ebmdatalab/openprescribing/contents/"
+        "openprescribing/measures/definitions"
+    )
 
-res = requests.get(repo_url, headers=headers, timeout=15)
-if res.status_code != 200:
-    st.error(f"Failed to fetch measure definitions: {res.status_code} — {res.text}")
-    st.stop()
-    
-rows = []
-link_hits = {}  # url -> set of measure names it was found in
-measure_links = {}  # measure name -> list of urls found in its why_it_matters
+    res = requests.get(repo_url, headers=headers, timeout=15)
+    if res.status_code != 200:
+        raise RuntimeError(f"{res.status_code} — {res.text}")
 
-for item in res.json():
-    if not item.get("name", "").endswith(".json"):
-        continue
+    rows = []
+    link_hits = {}  # url -> set of measure names it was found in
+    measure_links = {}  # measure name -> list of urls found in its why_it_matters
 
-    github_url = item.get("html_url")
-    measure_id = measure_id_from_github_url(github_url)
+    for item in res.json():
+        if not item.get("name", "").endswith(".json"):
+            continue
 
-    try:
-        data = requests.get(item["download_url"], timeout=10).json()
-    except Exception:
-        continue
+        github_url = item.get("html_url")
+        measure_id = measure_id_from_github_url(github_url)
 
-    authored_by = data.get("authored_by", "")
-    if isinstance(authored_by, list):
-        authored_by = authored_by[0] if authored_by else ""
-
-    checked_by = data.get("checked_by", "")
-    if isinstance(checked_by, list):
-        checked_by = checked_by[0] if checked_by else ""
-
-    next_review = data.get("next_review")
-    if isinstance(next_review, list):
-        next_review = next_review[0]
-    if isinstance(next_review, str):
         try:
-            next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
+            data = requests.get(item["download_url"], timeout=10).json()
         except Exception:
-            next_review = None
+            continue
 
-    measure_name = data.get("name", measure_id)
+        authored_by = data.get("authored_by", "")
+        if isinstance(authored_by, list):
+            authored_by = authored_by[0] if authored_by else ""
 
-    # Pull out any href='...' links from the why_it_matters field so we can
-    # check them below.
-    for url in extract_hrefs(data.get("why_it_matters")):
-        url = url.strip()
-        link_hits.setdefault(url, set()).add(measure_name)
-        measure_links.setdefault(measure_name, []).append(url)
+        checked_by = data.get("checked_by", "")
+        if isinstance(checked_by, list):
+            checked_by = checked_by[0] if checked_by else ""
 
-    rows.append({
-        "measure_name": measure_name,
-        "measure_id": measure_id,
-        "github_url": github_url,
-        "authored_by": email_to_name(authored_by),
-        "checked_by": email_to_name(checked_by),
-        "next_review": next_review,
-        "next_review_months": review_months(next_review),
-    })
+        next_review = data.get("next_review")
+        if isinstance(next_review, list):
+            next_review = next_review[0]
+        if isinstance(next_review, str):
+            try:
+                next_review = datetime.strptime(next_review, "%Y-%m-%d").date()
+            except Exception:
+                next_review = None
+
+        measure_name = data.get("name", measure_id)
+
+        # Pull out any href='...' links from the why_it_matters field so we can
+        # check them below.
+        for url in extract_hrefs(data.get("why_it_matters")):
+            url = url.strip()
+            link_hits.setdefault(url, set()).add(measure_name)
+            measure_links.setdefault(measure_name, []).append(url)
+
+        rows.append({
+            "measure_name": measure_name,
+            "measure_id": measure_id,
+            "github_url": github_url,
+            "authored_by": email_to_name(authored_by),
+            "checked_by": email_to_name(checked_by),
+            "next_review": next_review,
+            "next_review_months": review_months(next_review),
+        })
+
+    return rows, link_hits, measure_links
+
+try:
+    rows, link_hits, measure_links = fetch_measures_and_links(github_token)
+except Exception as e:
+    st.error(f"Failed to fetch measure definitions: {e}")
+    st.stop()
 
 df = pd.DataFrame(rows)
 
 # ----------------------------
-# Check links (needed for the broken/unverified count columns below,
-# and reused later for the link table)
+# Check links (needed for the broken/unverified count columns and filter below)
 # ----------------------------
 if link_hits:
     with st.spinner(f"Checking {len(link_hits)} link(s)…"):
