@@ -305,7 +305,8 @@ for item in res.json():
 df = pd.DataFrame(rows)
 
 # ----------------------------
-# Check links (needed for the broken/unverified count columns and filter below)
+# Check links (needed for the broken/unverified count columns below,
+# and reused later for the link table)
 # ----------------------------
 if link_hits:
     with st.spinner(f"Checking {len(link_hits)} link(s)…"):
