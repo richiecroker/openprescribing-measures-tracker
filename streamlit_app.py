@@ -85,6 +85,17 @@ LINK_CHECK_HEADERS = {
     "Accept-Language": "en-GB,en;q=0.9",
 }
 
+def _looks_like_bot_block(resp):
+    """Heuristic: is this a Cloudflare/WAF challenge page rather than a real 4xx/5xx?"""
+    if resp.status_code not in (403, 503):
+        return False
+    server = resp.headers.get("Server", "").lower()
+    if "cloudflare" in server:
+        return True
+    if "cf-mitigated" in resp.headers or "cf-ray" in resp.headers:
+        return True
+    return False
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def check_url(url, timeout=10.0):
     """Check a single URL. Cached for 24h so reruns/filters don't re-hit the network."""
@@ -93,6 +104,8 @@ def check_url(url, timeout=10.0):
         resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
         if resp.status_code >= 400 or resp.status_code == 405:
             resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True, stream=True)
+        if _looks_like_bot_block(resp):
+            return ("BLOCKED", "Bot/Cloudflare protection - verify manually")
         return (str(resp.status_code), "OK" if resp.status_code < 400 else "Error")
     except requests.exceptions.SSLError as e:
         return ("SSL_ERROR", str(e))
@@ -448,12 +461,14 @@ if link_hits:
         return status.isdigit() and status.startswith(("2", "3"))
 
     n_ok = sum(1 for r in link_rows if _link_ok(r["status"]))
-    n_bad = len(link_rows) - n_ok
+    n_blocked = sum(1 for r in link_rows if r["status"] == "BLOCKED")
+    n_bad = len(link_rows) - n_ok - n_blocked
 
-    lcol1, lcol2, lcol3 = st.columns(3)
+    lcol1, lcol2, lcol3, lcol4 = st.columns(4)
     lcol1.metric("Total links", len(link_rows))
     lcol2.metric("OK", n_ok)
-    lcol3.metric("Broken / errored", n_bad)
+    lcol3.metric("Blocked (unverified)", n_blocked)
+    lcol4.metric("Broken", n_bad)
 
     link_df = link_df.sort_values(by="status", key=lambda s: s.astype(str))
 
