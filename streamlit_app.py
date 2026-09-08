@@ -314,20 +314,22 @@ if link_hits:
 else:
     link_results = {}
 
-def _count_link_statuses(urls):
-    broken = 0
-    unverified = 0
+def _link_status_urls(urls):
+    broken = []
+    unverified = []
     for u in urls:
         status, _ = link_results.get(u, ("?", ""))
         if status == "BLOCKED":
-            unverified += 1
+            unverified.append(u)
         elif not (status.isdigit() and status.startswith(("2", "3"))):
-            broken += 1
+            broken.append(u)
     return broken, unverified
 
-_link_counts = df["measure_name"].apply(lambda m: _count_link_statuses(measure_links.get(m, [])))
-df["broken_links"] = _link_counts.apply(lambda t: t[0])
-df["unverified_links"] = _link_counts.apply(lambda t: t[1])
+_link_status = df["measure_name"].apply(lambda m: _link_status_urls(measure_links.get(m, [])))
+df["broken_urls"] = _link_status.apply(lambda t: t[0])
+df["unverified_urls"] = _link_status.apply(lambda t: t[1])
+df["broken_links"] = df["broken_urls"].apply(len)
+df["unverified_links"] = df["unverified_urls"].apply(len)
 
 # ----------------------------
 # Slider filter
@@ -434,6 +436,16 @@ cols = [
 html = []
 html.append("<tr>" + "".join(f"<th>{label}</th>" for _, label in cols) + "</tr>")
 
+def _links_popup(urls, color):
+    """Render a count that expands (native <details>/<summary>) to list the URLs on click."""
+    if not urls:
+        return "0"
+    items = "".join(f'<div><a href="{u}" target="_blank">{u}</a></div>' for u in urls)
+    return (
+        f'<details><summary style="color:{color};font-weight:bold;cursor:pointer;">{len(urls)}</summary>'
+        f'<div style="text-align:left;font-weight:normal;margin-top:4px;">{items}</div></details>'
+    )
+
 for _, r in df.iterrows():
     css = row_css(r["next_review_months"])
     link = (
@@ -441,8 +453,8 @@ for _, r in df.iterrows():
         f'style="color:inherit;text-decoration:underline;">'
         f'{r["measure_name"]}</a>'
     )
-    broken_css = "color:red;font-weight:bold;" if r["broken_links"] > 0 else ""
-    unverified_css = "color:orange;font-weight:bold;" if r["unverified_links"] > 0 else ""
+    broken_cell = _links_popup(r["broken_urls"], "red")
+    unverified_cell = _links_popup(r["unverified_urls"], "orange")
     html.append(
         "<tr>"
         f'<td style="{css}">{link}</td>'
@@ -452,8 +464,8 @@ for _, r in df.iterrows():
         f'<td style="{css}">{"" if pd.isna(r["next_review_months"]) else int(r["next_review_months"])}</td>'
         f'<td style="{css}">{int(r["views_30d"]) if pd.notna(r["views_30d"]) else ""}</td>'
         f'<td style="{css}">{int(r["views_12m"]) if pd.notna(r["views_12m"]) else ""}</td>'
-        f'<td style="{broken_css}">{r["broken_links"]}</td>'
-        f'<td style="{unverified_css}">{r["unverified_links"]}</td>'
+        f'<td>{broken_cell}</td>'
+        f'<td>{unverified_cell}</td>'
         "</tr>"
     )
 
@@ -467,44 +479,3 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# ----------------------------
-# Link check table (beneath the measures table)
-# ----------------------------
-st.markdown("---")
-st.subheader("Links referenced in measure definitions")
-
-if link_hits:
-    link_rows = []
-    for url, measures in link_hits.items():
-        status, detail = link_results.get(url, ("?", ""))
-        link_rows.append({
-            "url": url,
-            "status": status,
-            "detail": detail,
-            "found_in": ", ".join(sorted(measures)),
-        })
-
-    link_df = pd.DataFrame(link_rows)
-
-    def _link_ok(status):
-        return status.isdigit() and status.startswith(("2", "3"))
-
-    n_ok = sum(1 for r in link_rows if _link_ok(r["status"]))
-    n_blocked = sum(1 for r in link_rows if r["status"] == "BLOCKED")
-    n_bad = len(link_rows) - n_ok - n_blocked
-
-    lcol1, lcol2, lcol3, lcol4 = st.columns(4)
-    lcol1.metric("Total links", len(link_rows))
-    lcol2.metric("OK", n_ok)
-    lcol3.metric("Blocked (unverified)", n_blocked)
-    lcol4.metric("Broken", n_bad)
-
-    link_df = link_df.sort_values(by="status", key=lambda s: s.astype(str))
-
-    st.dataframe(link_df, use_container_width=True, hide_index=True)
-
-    csv = link_df.to_csv(index=False).encode("utf-8")
-    st.download_button("Download link check results as CSV", csv, "measure_link_check.csv", "text/csv")
-else:
-    st.info("No links found in the measure definitions currently loaded.")
