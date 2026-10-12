@@ -376,21 +376,36 @@ if org_breakdowns_30d and org_breakdowns_12m:
                 "Views (12m)": by_12.get(code, 0),
             })
     org_df = pd.DataFrame(org_tables, columns=["Organisation type", "Organisation", "Views (30d)", "Views (12m)"])
-    selected_type = st.selectbox("Organisation type breakdown", ORG_TYPES)
-    selected = org_df.loc[org_df["Organisation type"] == selected_type].copy()
-    selected = selected.sort_values(["Views (12m)", "Organisation"], ascending=[False, True])
-    st.dataframe(selected[["Organisation", "Views (30d)", "Views (12m)"]], hide_index=True, use_container_width=True)
-    st.download_button(
-        "Download selected organisation breakdown (CSV)",
-        selected.to_csv(index=False).encode("utf-8-sig"),
-        file_name=f"openprescribing_{selected_type.replace('/', '_')}_pageviews.csv",
-        mime="text/csv",
-    )
+    # Show every organisation type explicitly.  The previous version used a
+    # selectbox which defaulted to practice, making it look as though only
+    # practice-level data had been retrieved.
+    for org_type in ORG_TYPES:
+        st.markdown(f"#### {org_type}")
+        selected = org_df.loc[org_df["Organisation type"] == org_type].copy()
+        selected = selected.sort_values(["Views (12m)", "Organisation"], ascending=[False, True])
+
+        if selected.empty:
+            st.caption("No matching pageviews returned by Plausible for this organisation type.")
+        else:
+            st.dataframe(
+                selected[["Organisation", "Views (30d)", "Views (12m)"]],
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.download_button(
+                f"Download {org_type} breakdown (CSV)",
+                selected.to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"openprescribing_{org_type.replace('/', '_')}_pageviews.csv",
+                mime="text/csv",
+                key=f"download_{org_type}",
+            )
+
     st.download_button(
         "Download all organisation breakdowns (CSV)",
         org_df.to_csv(index=False).encode("utf-8-sig"),
         file_name="openprescribing_all_organisation_pageviews.csv",
         mime="text/csv",
+        key="download_all_orgs",
     )
 
 st.markdown("---")
